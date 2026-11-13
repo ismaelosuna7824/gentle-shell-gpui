@@ -278,6 +278,7 @@ backdrop.occlude().child(ui::pop_in(
 - Header, in this order: `small` icon in `muted`, `text_base SEMIBOLD` title, subtitle that takes the remaining space and truncates, optional actions (spinner, count chip, `segmented`, `ghost().xsmall()` buttons with tooltip) and the close X (`ghost().xsmall()` with `IconName::X`). No `esc` badge in the header: Esc closes every screen anyway.
 - The body is the only part that scrolls (`flex_1().min_h_0().overflow_y_scroll()` with an id).
 - The view does not handle Esc: it emits its `Close` event and the `Workspace` removes it (`on_close_overlay`). The veil uses `.occlude()` so clicks do not pass through to what is behind; only the palette closes on a click on the veil.
+- Screens open below the title bar (`Workspace::render` places them under its 36 px), so its buttons stay usable: a screen button opens its screen in place of the current one, and the open screen's button shows selected and closes it. Only the welcome and onboarding cover the whole window.
 
 ### Full screen: welcome
 
