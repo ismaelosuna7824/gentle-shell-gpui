@@ -214,7 +214,7 @@ impl SessionView {
     // ── Status chips (Tern-style: everything that used to sit in a side
     //    panel lives in small chips over the composer, each opening a card) ──
 
-    /// Background jobs: "⧗ 2 running" or "Jobs 3", with the list on click.
+    /// Background jobs: "2 running" or "Jobs 3", with the list on click.
     fn render_jobs_chip(&self) -> impl IntoElement + use<> {
         let running = self.activity.jobs.iter().filter(|j| j.is_running()).count();
         let total = self.activity.jobs.len();
