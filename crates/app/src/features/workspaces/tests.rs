@@ -91,8 +91,9 @@ fn file_round_trip() {
     let _ = std::fs::remove_dir_all(dir);
 }
 
-/// A newer build saved a pane kind this one doesn't know (`history`): the
-/// file still loads with every workspace, and only that pane goes.
+/// A newer build saved a pane kind this one doesn't know (as the History
+/// pane was for older builds): the file still loads with every workspace,
+/// and only that pane goes.
 #[test]
 fn unknown_pane_kinds_drop_only_those_panes() {
     let dir = std::env::temp_dir().join(format!("gentle-ws-unknown-{}", std::process::id()));
@@ -101,9 +102,9 @@ fn unknown_pane_kinds_drop_only_those_panes() {
     let mut json = serde_json::to_value(sample()).unwrap();
     // Workspace 1: the file pane (second of the inner split) becomes unknown.
     json["workspaces"][1]["tabs"][0]["layout"]["split"]["second"]["split"]["second"]["leaf"]["kind"] =
-        "history".into();
+        "from_a_newer_build".into();
     // Workspace 0: its only tab is unknown and goes; a second tab stays.
-    json["workspaces"][0]["tabs"][0]["layout"]["leaf"]["kind"] = "history".into();
+    json["workspaces"][0]["tabs"][0]["layout"]["leaf"]["kind"] = "from_a_newer_build".into();
     let kept = serde_json::to_value(&sample().workspaces[0].tabs[0]).unwrap();
     json["workspaces"][0]["tabs"]
         .as_array_mut()
