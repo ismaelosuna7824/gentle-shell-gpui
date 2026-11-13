@@ -20,9 +20,6 @@ use gentle_core::transcript::{UserImage, image_key};
 /// Largest image accepted, before base64.
 pub const MAX_IMAGE_BYTES: u64 = 20 * 1024 * 1024;
 
-/// Extensions worth trying when a paste carries file paths.
-const IMAGE_EXTENSIONS: [&str; 8] = ["png", "jpg", "jpeg", "gif", "webp", "bmp", "tif", "tiff"];
-
 /// An image waiting in the composer.
 #[derive(Clone, Debug)]
 pub struct Attachment {
@@ -94,11 +91,32 @@ pub fn load_path(path: &Path) -> Result<Attachment, Rejection> {
     Attachment::from_bytes(&name, bytes)
 }
 
-/// Whether a pasted path looks like an image (pasted non-images stay text).
-pub fn has_image_extension(path: &Path) -> bool {
-    path.extension()
-        .and_then(|e| e.to_str())
-        .is_some_and(|e| IMAGE_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
+/// Whether a pasted path is an image, judged by its first bytes rather than
+/// its extension (a misnamed `shot.pnmg` still attaches; pasted non-images
+/// stay text).
+pub fn is_image_file(path: &Path) -> bool {
+    use std::io::Read as _;
+    let mut head = [0u8; 12];
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return false;
+    };
+    let mut read = 0;
+    while read < head.len() {
+        match file.read(&mut head[read..]) {
+            Ok(0) | Err(_) => break,
+            Ok(n) => read += n,
+        }
+    }
+    is_image_header(&head[..read])
+}
+
+/// The formats [`Attachment::from_bytes`] takes: those [`sniff`] knows, plus
+/// BMP (`BM`, then zeroed reserved bytes) and TIFF, which it converts to PNG.
+fn is_image_header(head: &[u8]) -> bool {
+    sniff(head).is_some()
+        || (head.starts_with(b"BM") && head.get(6..10) == Some(&[0; 4]))
+        || head.starts_with(b"II*\0")
+        || head.starts_with(b"MM\0*")
 }
 
 /// Why an image was not attached.
@@ -600,8 +618,17 @@ mod tests {
             load_path(&dir.join("missing.png")),
             Err(Rejection::Unreadable { .. })
         ));
-        assert!(has_image_extension(&png));
-        assert!(!has_image_extension(&text));
+        // Judged by content: a misnamed PNG attaches, a `.png` text doesn't.
+        let misnamed = dir.join("bug.pnmg");
+        std::fs::write(&misnamed, PNG).unwrap();
+        let fake = dir.join("fake.png");
+        std::fs::write(&fake, "not an image").unwrap();
+        assert!(is_image_file(&png));
+        assert!(is_image_file(&misnamed));
+        assert_eq!(load_path(&misnamed).unwrap().mime_type(), "image/png");
+        assert!(!is_image_file(&fake));
+        assert!(!is_image_file(&text));
+        assert!(!is_image_file(&dir.join("missing.png")));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
