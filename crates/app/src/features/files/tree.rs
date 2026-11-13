@@ -107,6 +107,8 @@ pub fn init(cx: &mut App) {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FileTreeEvent {
+    /// Show a file in the quick-look modal over the panes (a single click).
+    Peek(PathBuf),
     /// Show a file in the tab's preview pane.
     Open(PathBuf),
     /// Show a file in a new split beside the focused pane.
@@ -553,13 +555,23 @@ impl FileTreeView {
         cx.notify();
     }
 
-    fn click_entry(&mut self, entry: &Entry, window: &mut Window, cx: &mut Context<Self>) {
+    /// A click on a row: folders toggle; a file shows in the quick-look modal,
+    /// and the second click of a double click moves it into a pane.
+    fn click_entry(
+        &mut self,
+        entry: &Entry,
+        clicks: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.selected = Some(entry.path.clone());
         self.focus.focus(window, cx);
         if entry.is_dir {
             self.toggle_dir(&entry.path, cx);
-        } else {
+        } else if clicks >= 2 {
             cx.emit(FileTreeEvent::Open(entry.path.clone()));
+        } else {
+            cx.emit(FileTreeEvent::Peek(entry.path.clone()));
         }
         cx.notify();
     }
@@ -1119,7 +1131,9 @@ impl FileTreeView {
                     cx.notify();
                 }),
             )
-            .on_click(cx.listener(move |this, _, window, cx| this.click_entry(&click, window, cx)))
+            .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
+                this.click_entry(&click, event.click_count(), window, cx)
+            }))
     }
 
     /// The inline name field of the edit in progress.

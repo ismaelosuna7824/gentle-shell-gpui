@@ -106,6 +106,7 @@ pub fn attach_sidebar(
         window
             .subscribe(&tree, cx, move |_, event: &FileTreeEvent, window, cx| {
                 let _ = target.update(cx, |workspace, cx| match event {
+                    FileTreeEvent::Peek(path) => workspace.peek_file(path.clone(), window, cx),
                     FileTreeEvent::Open(path) => workspace.open_file(path.clone(), window, cx),
                     FileTreeEvent::OpenToSide(path) => {
                         workspace.open_file_beside(path.clone(), window, cx)

@@ -418,11 +418,13 @@ impl Render for Workspace {
                     }))
                     .child(
                         div()
+                            .relative()
                             .flex()
                             .flex_1()
                             .min_w_0()
                             .h_full()
-                            .child(self.render_body(window, cx)),
+                            .child(self.render_body(window, cx))
+                            .children(self.render_peek(cx)),
                     )
                     .when(devices_docked, |row| row.child(self.devices.clone())),
             )

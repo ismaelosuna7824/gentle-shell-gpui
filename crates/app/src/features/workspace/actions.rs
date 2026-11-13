@@ -11,6 +11,15 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        // A link followed inside the quick look shows there too.
+        if self
+            .peek
+            .as_ref()
+            .is_some_and(|peek| peek.item.view.entity_id() == action.pane)
+        {
+            self.peek_file(action.path.clone(), window, cx);
+            return;
+        }
         let Some(id) = self
             .panes
             .iter()
@@ -211,6 +220,7 @@ impl Workspace {
             Some((Overlay::Onboarding(view), _)) if view.read(cx).busy() => {}
             Some((Overlay::Welcome(view), _)) if view.read(cx).busy(cx) => {}
             Some(_) => self.close_overlay(window, cx),
+            None if self.peek.is_some() => self.close_peek(window, cx),
             None => cx.propagate(),
         }
     }
