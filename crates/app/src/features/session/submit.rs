@@ -220,12 +220,28 @@ impl SessionView {
         if paths.is_empty() {
             return;
         }
-        let loading = cx.background_executor().spawn(async move {
-            paths
-                .iter()
-                .map(|path| attachments::load_path(path))
-                .collect::<Vec<_>>()
-        });
+        self.attach_off_thread(
+            move || {
+                paths
+                    .iter()
+                    .map(|path| attachments::load_path(path))
+                    .collect()
+            },
+            window,
+            cx,
+        );
+    }
+
+    /// Run `load` on the background executor, then attach what it read.
+    fn attach_off_thread(
+        &mut self,
+        load: impl FnOnce() -> Vec<Result<attachments::Attachment, attachments::Rejection>>
+        + Send
+        + 'static,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let loading = cx.background_executor().spawn(async move { load() });
         cx.spawn_in(window, async move |this, cx| {
             let loaded = loading.await;
             let _ = this.update_in(cx, |this, window, cx| this.attach(loaded, window, cx));
@@ -245,10 +261,7 @@ impl SessionView {
         let mut paths = Vec::new();
         for entry in item.entries() {
             match entry {
-                ClipboardEntry::Image(image) => images.push(attachments::Attachment::from_bytes(
-                    "The pasted image",
-                    image.bytes.clone(),
-                )),
+                ClipboardEntry::Image(image) => images.push(image.bytes.clone()),
                 ClipboardEntry::ExternalPaths(external) => {
                     paths.extend(external.paths().iter().cloned())
                 }
@@ -263,7 +276,17 @@ impl SessionView {
             return false;
         }
         if !images.is_empty() {
-            self.attach(images, window, cx);
+            // Off the UI thread: a BMP or TIFF screenshot is re-encoded first.
+            self.attach_off_thread(
+                move || {
+                    images
+                        .into_iter()
+                        .map(|bytes| attachments::Attachment::from_bytes("The pasted image", bytes))
+                        .collect()
+                },
+                window,
+                cx,
+            );
         }
         self.attach_paths(paths, window, cx);
         true
