@@ -13,8 +13,9 @@ anyhow.workspace = true
 async-channel.workspace = true
 base64 = "0.22"
 dunce = "1"
-# Device previews: PNG decoding for iOS screenshots and raw-frame construction.
-image = { version = "0.25", default-features = false, features = ["png"] }
+# Device previews: PNG decoding for iOS screenshots and raw-frame construction;
+# pasted BMP (Windows' Snipping Tool) and TIFF images are re-encoded as PNG.
+image = { version = "0.25", default-features = false, features = ["png", "bmp", "tiff"] }
 serde.workspace = true
 serde_json.workspace = true
 gentle-core = { path = "../core" }

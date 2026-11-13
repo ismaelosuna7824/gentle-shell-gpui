@@ -21,7 +21,7 @@ use gentle_core::transcript::{UserImage, image_key};
 pub const MAX_IMAGE_BYTES: u64 = 20 * 1024 * 1024;
 
 /// Extensions worth trying when a paste carries file paths.
-const IMAGE_EXTENSIONS: [&str; 5] = ["png", "jpg", "jpeg", "gif", "webp"];
+const IMAGE_EXTENSIONS: [&str; 8] = ["png", "jpg", "jpeg", "gif", "webp", "bmp", "tif", "tiff"];
 
 /// An image waiting in the composer.
 #[derive(Clone, Debug)]
@@ -35,8 +35,13 @@ pub struct Attachment {
 
 impl Attachment {
     /// Accept PNG, JPEG, GIF or WebP bytes (sniffed, not trusted from a
-    /// name) up to [`MAX_IMAGE_BYTES`].
+    /// name) up to [`MAX_IMAGE_BYTES`]; BMP and TIFF are converted to PNG
+    /// first ([`to_png`]).
     pub fn from_bytes(name: &str, bytes: Vec<u8>) -> Result<Self, Rejection> {
+        let bytes = match sniff(&bytes) {
+            Some(_) => bytes,
+            None => to_png(&bytes).unwrap_or(bytes),
+        };
         let size = bytes.len() as u64;
         if size > MAX_IMAGE_BYTES {
             return Err(Rejection::TooLarge {
@@ -108,7 +113,10 @@ impl fmt::Display for Rejection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Unsupported { name } => {
-                write!(f, "{name} is not a PNG, JPEG, GIF or WebP image.")
+                write!(
+                    f,
+                    "{name} is not a PNG, JPEG, GIF, WebP, BMP or TIFF image."
+                )
             }
             Self::TooLarge { name, bytes } => write!(
                 f,
@@ -118,6 +126,26 @@ impl fmt::Display for Rejection {
             Self::Unreadable { name, error } => write!(f, "Could not read {name}: {error}"),
         }
     }
+}
+
+/// A BMP or TIFF re-encoded as PNG, the formats providers don't take but
+/// clipboards hand over: Windows' Snipping Tool and Print Screen put a DIB
+/// (GPUI gives it as BMP), and some macOS and Linux copies are TIFF. `None`
+/// for anything else or bytes that don't decode.
+fn to_png(bytes: &[u8]) -> Option<Vec<u8>> {
+    use image::codecs::png::{CompressionType, FilterType, PngEncoder};
+
+    let format = image::guess_format(bytes).ok()?;
+    if !matches!(format, image::ImageFormat::Bmp | image::ImageFormat::Tiff) {
+        return None;
+    }
+    let decoded = image::load_from_memory_with_format(bytes, format).ok()?;
+    let mut png = Vec::new();
+    // Fast: a full-screen capture is encoded while the paste waits on it.
+    let encoder =
+        PngEncoder::new_with_quality(&mut png, CompressionType::Fast, FilterType::Adaptive);
+    decoded.write_with_encoder(encoder).ok()?;
+    Some(png)
 }
 
 /// The image format of `bytes` from its magic number, for the formats Pi's
@@ -501,6 +529,29 @@ mod tests {
         assert_eq!(sniff(b"BM\x36\0\0\0"), None);
         assert_eq!(sniff(b"<svg xmlns"), None);
         assert_eq!(sniff(b""), None);
+    }
+
+    /// Windows' Snipping Tool pastes a DIB, which GPUI hands over as BMP;
+    /// providers only take PNG, JPEG, GIF and WebP.
+    #[test]
+    fn bmp_and_tiff_pastes_are_sent_as_png() {
+        let pixels =
+            image::RgbImage::from_fn(3, 2, |x, y| image::Rgb([x as u8 * 80, y as u8 * 120, 200]));
+        for format in [image::ImageFormat::Bmp, image::ImageFormat::Tiff] {
+            let mut bytes = std::io::Cursor::new(Vec::new());
+            pixels.write_to(&mut bytes, format).unwrap();
+            let attachment =
+                Attachment::from_bytes("The pasted image", bytes.into_inner()).unwrap();
+            assert_eq!(attachment.mime_type(), "image/png", "{format:?}");
+            let png = STANDARD.decode(&*attachment.data).unwrap();
+            let back = image::load_from_memory_with_format(&png, image::ImageFormat::Png).unwrap();
+            assert_eq!(back.to_rgb8(), pixels, "{format:?} keeps its pixels");
+        }
+        // Something that only starts like a BMP is still refused.
+        assert!(matches!(
+            Attachment::from_bytes("x", b"BM\x36\0\0\0junk".to_vec()),
+            Err(Rejection::Unsupported { .. })
+        ));
     }
 
     #[test]
