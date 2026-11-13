@@ -270,6 +270,29 @@ impl Workspace {
         Some(id)
     }
 
+    /// A pane for an already built file view of `path`.
+    pub(super) fn file_pane(&mut self, item: PaneItem, path: PathBuf, cx: &App) -> PaneId {
+        let id = self.alloc_id();
+        let cwd = path
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| self.space().root.clone());
+        let mut pane = Pane {
+            item,
+            session: None,
+            cwd,
+            path: Some(path),
+            session_file: None,
+            title: SharedString::default(),
+            running: false,
+            needs_you: false,
+            _subscriptions: Vec::new(),
+        };
+        pane.sync_chrome(cx);
+        self.panes.insert(id, pane);
+        id
+    }
+
     pub(super) fn new_pane(
         &mut self,
         kind: PaneKind,
@@ -351,8 +374,11 @@ impl Workspace {
         }
     }
 
+    /// Focus the quick look while it shows, else the active tab's focused pane.
     pub(super) fn focus_active(&self, window: &mut Window, cx: &mut App) {
-        if let Some(pane) = self.focused_pane().and_then(|id| self.panes.get(&id)) {
+        if let Some(peek) = &self.peek {
+            peek.item.focus.focus(window, cx);
+        } else if let Some(pane) = self.focused_pane().and_then(|id| self.panes.get(&id)) {
             pane.item.focus.focus(window, cx);
         }
     }

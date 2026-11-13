@@ -12,6 +12,7 @@ pub mod fuzzy;
 pub mod gentle_state;
 pub mod git;
 pub mod hydration;
+pub mod ides;
 pub mod markdown;
 pub mod music;
 pub mod notifications;
