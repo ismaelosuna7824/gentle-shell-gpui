@@ -32,6 +32,11 @@ trash = "5"
 zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
 flate2 = "1"
 tar = "0.4"
+# Mermaid diagrams in the Markdown preview: the app finds the system sans
+# font (fontdb) that merman's CLI, downloaded on demand, measures text with;
+# its macOS and Linux builds come as .tar.xz (lzma-rs).
+fontdb = "0.23"
+lzma-rs = "0.3"
 
 # The X11 window icon (GPUI's `WindowOptions::icon`), and the in-app browser
 # for the Gentle Design canvas: WebKitGTK as a child of the X11 window (GTK's

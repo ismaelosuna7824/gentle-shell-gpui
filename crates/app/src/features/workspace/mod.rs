@@ -18,6 +18,7 @@ use gpui_kit::component::{Icon, Sizable as _, TitleBar, WindowExt as _, h_flex, 
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
+use crate::features::docs::{DocsEvent, DocsView};
 use crate::features::files::FileTreeView;
 use crate::features::memory::{MemoryEvent, MemoryView};
 use crate::features::notices::{self, Notices};
@@ -33,7 +34,9 @@ use crate::features::settings::{SettingsEvent, SettingsView};
 use crate::features::usage::{UsageEvent, UsageView};
 use crate::features::welcome::{WelcomeEvent, WelcomeView};
 use crate::features::workspaces::{self, SavedPane, SavedState, SavedTab, SavedWorkspace};
-use crate::shared::pane::{PaneFactories, PaneId, PaneItem, PaneKind, PaneTree, SplitAxis};
+use crate::shared::pane::{
+    PaneFactories, PaneId, PaneItem, PaneKind, PaneTree, ShowInPane, SplitAxis,
+};
 use crate::shared::ui;
 use gentle_core::commands::Screen;
 
@@ -99,6 +102,7 @@ enum Overlay {
     Palette(Entity<PaletteView>),
     Usage(Entity<UsageView>),
     Memory(Entity<MemoryView>),
+    Docs(Entity<DocsView>),
     Settings(Entity<SettingsView>),
     Profiles(Entity<ProfilesView>),
     Onboarding(Entity<OnboardingView>),

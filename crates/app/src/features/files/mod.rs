@@ -4,15 +4,22 @@
 
 mod changes;
 mod listing;
+mod mermaid;
 mod ops;
 mod refs;
 mod tree;
 mod viewer;
 
-pub use tree::{FileTreeEvent, FileTreeView, init};
+pub use mermaid::{
+    Renderer as DiagramRenderer, RendererState as DiagramRendererState,
+    install as install_diagram_renderer, renderer as diagram_renderer,
+};
+pub use tree::{FileTreeEvent, FileTreeView};
 pub use viewer::FileView;
 
 use std::path::Path;
+
+use gpui_kit::App;
 
 use gpui_kit::Hsla;
 use gpui_kit::assets::IconName;
@@ -20,6 +27,12 @@ use gpui_kit::assets::IconName;
 use crate::shared::ui;
 
 /// The icon and tint for a file name in the tree.
+/// Key bindings and the diagram renderer's state.
+pub fn init(cx: &mut App) {
+    tree::init(cx);
+    mermaid::init(cx);
+}
+
 fn file_icon(name: &str) -> (IconName, Hsla) {
     let lower = name.to_lowercase();
     let ext = lower.rsplit_once('.').map(|(_, e)| e).unwrap_or("");
