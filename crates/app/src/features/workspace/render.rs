@@ -47,6 +47,7 @@ impl Render for Workspace {
                 crate::features::browser::reclaim_keyboard(window)
             })
             .on_action(cx.listener(Self::on_new_tab))
+            .on_action(cx.listener(Self::on_show_in_pane))
             .on_action(cx.listener(Self::on_new_terminal_tab))
             .on_action(cx.listener(Self::on_close_tab))
             .on_action(cx.listener(Self::on_next_tab))

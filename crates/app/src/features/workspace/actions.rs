@@ -3,6 +3,47 @@
 use super::*;
 
 impl Workspace {
+    /// A file pane's preview followed a link to another Markdown file: show
+    /// it in that pane, or beside it while the pane has unsaved edits.
+    pub(super) fn on_show_in_pane(
+        &mut self,
+        action: &ShowInPane,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(id) = self
+            .panes
+            .iter()
+            .find(|(_, pane)| pane.item.view.entity_id() == action.pane)
+            .map(|(id, _)| *id)
+        else {
+            return;
+        };
+        let unsaved = self.panes[&id]
+            .item
+            .unsaved
+            .as_ref()
+            .is_some_and(|probe| probe(cx));
+        let Some(factory) = PaneFactories::get(cx).file.filter(|_| !unsaved) else {
+            self.open_file_beside(action.path.clone(), window, cx);
+            return;
+        };
+        let item = factory(action.path.clone(), window, cx);
+        if let Some(pane) = self.panes.get_mut(&id) {
+            pane.item = item;
+            pane.cwd = action
+                .path
+                .parent()
+                .map(Path::to_path_buf)
+                .unwrap_or_default();
+            pane.path = Some(action.path.clone());
+            pane.sync_chrome(cx);
+        }
+        self.focus_pane(id, window, cx);
+        self.schedule_save(cx);
+        cx.notify();
+    }
+
     pub(super) fn on_new_tab(&mut self, _: &NewTab, window: &mut Window, cx: &mut Context<Self>) {
         let cwd = self.active_cwd(cx);
         self.open_tab(PaneKind::Agent, cwd, None, None, window, cx);

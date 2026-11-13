@@ -27,6 +27,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::{file_icon, human_size, language, mermaid};
+use crate::shared::pane::ShowInPane;
 use crate::shared::ui;
 
 actions!(file_view, [Save]);
@@ -678,7 +679,9 @@ impl FileView {
     }
 
     /// The rendered buffer, scrolling on its own.
-    fn render_preview(md: &Markdown, cx: &App) -> Div {
+    /// Links to another Markdown file open in this pane: `pane` is this
+    /// view, focused first so the action reaches the workspace through it.
+    fn render_preview(md: &Markdown, pane: &(FocusHandle, EntityId), cx: &App) -> Div {
         let restore = md.restore.clone();
         let list = md.preview.read(cx).list_state().clone();
         let image_dir = md.dir.clone();
@@ -698,7 +701,10 @@ impl FileView {
                     .image(uri)
                     .unwrap_or_else(|| image_source(&image_dir, &images, uri))
             })
-            .on_link_click(move |url, _, _, cx| open_link(&link_dir, url, cx));
+            .on_link_click({
+                let (focus, pane) = pane.clone();
+                move |url, _, window, cx| open_link(&link_dir, url, &focus, pane, window, cx)
+            });
         let view = if md.mdx { view.markdown_mdx() } else { view };
         div()
             .relative()
@@ -1032,6 +1038,7 @@ impl Focusable for FileView {
 
 impl Render for FileView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let pane = (self.focus.clone(), cx.entity_id());
         let body = match &self.body {
             Body::Loading => v_flex()
                 .size_full()
@@ -1049,7 +1056,7 @@ impl Render for FileView {
                 };
                 match self.markdown.as_ref() {
                     Some(md) if md.mode == MdMode::Preview => {
-                        Self::render_preview(md, cx).into_any_element()
+                        Self::render_preview(md, &pane, cx).into_any_element()
                     }
                     // Editor left, preview right on an inset tint, kept off
                     // the pane's edges.
@@ -1059,7 +1066,7 @@ impl Render for FileView {
                         .child(div().flex_1().min_w_0().h_full().child(code()))
                         .child(
                             div().flex_1().min_w_0().h_full().pr_2().pb_2().child(
-                                Self::render_preview(md, cx)
+                                Self::render_preview(md, &pane, cx)
                                     .rounded_xl()
                                     .bg(ui::surface())
                                     .overflow_hidden(),
@@ -1351,14 +1358,26 @@ fn data_image(url: &str) -> Option<Arc<Image>> {
     Some(Arc::new(Image::from_bytes(format, bytes)))
 }
 
-/// A clicked preview link: URLs in the browser, local files (relative to
-/// the Markdown file) in their default app, in-page anchors nowhere.
-fn open_link(dir: &Path, url: &str, cx: &mut App) {
+/// A clicked preview link: URLs in the browser, another Markdown file in
+/// this pane (`pane`), other local files (relative to the Markdown file) in
+/// their default app, in-page anchors nowhere.
+fn open_link(
+    dir: &Path,
+    url: &str,
+    focus: &FocusHandle,
+    pane: EntityId,
+    window: &mut Window,
+    cx: &mut App,
+) {
     let url = url.trim();
     if url.is_empty() || url.starts_with('#') {
         return;
     }
     match local_target(dir, url) {
+        Some(path) if path.is_file() && is_markdown(&path) => {
+            window.focus(focus, cx);
+            window.dispatch_action(Box::new(ShowInPane { pane, path }), cx);
+        }
         Some(path) if path.exists() => cx.open_with_system(&path),
         Some(_) => {}
         None => cx.open_url(url),

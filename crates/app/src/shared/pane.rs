@@ -8,6 +8,15 @@ use gpui_kit::assets::IconName;
 use gpui_kit::*;
 use serde::{Deserialize, Serialize};
 
+/// A file pane asks to show another file in its place: a link to a local
+/// Markdown file clicked in its preview. `pane` is the pane item's view.
+#[derive(Clone, PartialEq, Action)]
+#[action(namespace = gentle, no_json)]
+pub struct ShowInPane {
+    pub pane: EntityId,
+    pub path: PathBuf,
+}
+
 /// What a pane shows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

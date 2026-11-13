@@ -34,7 +34,9 @@ use crate::features::settings::{SettingsEvent, SettingsView};
 use crate::features::usage::{UsageEvent, UsageView};
 use crate::features::welcome::{WelcomeEvent, WelcomeView};
 use crate::features::workspaces::{self, SavedPane, SavedState, SavedTab, SavedWorkspace};
-use crate::shared::pane::{PaneFactories, PaneId, PaneItem, PaneKind, PaneTree, SplitAxis};
+use crate::shared::pane::{
+    PaneFactories, PaneId, PaneItem, PaneKind, PaneTree, ShowInPane, SplitAxis,
+};
 use crate::shared::ui;
 use gentle_core::commands::Screen;
 
