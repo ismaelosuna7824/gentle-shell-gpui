@@ -277,7 +277,7 @@ impl SessionView {
             }
         }
         // Copied files that are not images paste as their names.
-        if !paths.iter().any(|p| attachments::has_image_extension(p)) {
+        if !paths.iter().any(|p| attachments::is_image_file(p)) {
             paths.clear();
         }
         if images.is_empty() && paths.is_empty() {
