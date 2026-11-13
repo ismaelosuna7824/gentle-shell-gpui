@@ -77,18 +77,23 @@ fn duration(ms: Option<u64>) -> String {
     ms.map(ui::format_duration).unwrap_or_else(|| "–".into())
 }
 
-/// One background job: status glyph, command and exit code. The Jobs chip's
+/// One background job: status marker, label and exit code. The Jobs chip's
 /// card and the Jobs tab both list jobs with it.
 pub(super) fn job_row(job: &Job) -> AnyElement {
-    let (glyph, color) = match job.outcome() {
-        JobOutcome::Running => ("⧗", ui::accent()),
-        JobOutcome::Succeeded => ("✓", ui::success()),
-        JobOutcome::Failed => ("✗", ui::danger()),
+    // The running marker is an icon, not a text glyph: `⧗` is missing from
+    // the fonts of minimal Linux installs (WSLg) and drew as an empty box.
+    let marker = match job.outcome() {
+        JobOutcome::Running => ui::spinner(Size::XSmall, ui::accent()).into_any_element(),
+        JobOutcome::Succeeded => div()
+            .text_color(ui::success())
+            .child("✓")
+            .into_any_element(),
+        JobOutcome::Failed => div().text_color(ui::danger()).child("✗").into_any_element(),
     };
     h_flex()
         .gap_2()
         .text_size(px(12.))
-        .child(div().flex_none().text_color(color).child(glyph))
+        .child(div().flex_none().child(marker))
         .child(
             div()
                 .flex_1()
