@@ -3,9 +3,10 @@
 use super::*;
 
 impl Workspace {
-    /// Puts a freshly built file/diff pane in the current tab: it replaces the
-    /// tab's existing preview pane, else splits the largest pane along its
-    /// long side, else (no room for two panes) gets its own tab.
+    /// Puts a freshly built file, diff or history pane in the current tab: it
+    /// replaces the tab's existing pane of the same kind, else splits the
+    /// largest pane along its long side, else (no room for two panes) gets
+    /// its own tab.
     pub(super) fn place_preview(
         &mut self,
         new: PaneId,
@@ -16,12 +17,13 @@ impl Workspace {
             self.push_pane_tab(new, window, cx);
             return;
         };
+        let kind = self.panes.get(&new).map(|p| p.item.kind);
         let preview = tab.tree.leaves().into_iter().find(|id| {
             *id != new
                 && self
                     .panes
                     .get(id)
-                    .is_some_and(|p| p.item.kind == PaneKind::File)
+                    .is_some_and(|p| Some(p.item.kind) == kind)
         });
         if let Some(old) = preview
             && let Some(pane) = self.panes.remove(&new)
@@ -214,8 +216,8 @@ impl Workspace {
         id
     }
 
-    /// A terminal (`target` = folder) or file (`target` = file) pane from the
-    /// registered factory; a notice when there is none.
+    /// A terminal or history (`target` = folder) or file (`target` = file)
+    /// pane from the registered factory; a notice when there is none.
     pub(super) fn new_factory_pane(
         &mut self,
         kind: PaneKind,
@@ -227,6 +229,7 @@ impl Workspace {
         let factory = match kind {
             PaneKind::Terminal => factories.terminal,
             PaneKind::File => factories.file,
+            PaneKind::History => factories.history,
             PaneKind::Agent => None,
         };
         let Some(factory) = factory else {
@@ -235,6 +238,7 @@ impl Workspace {
                     "{} panes are not available in this build.",
                     match kind {
                         PaneKind::File => "File",
+                        PaneKind::History => "History",
                         _ => "Terminal",
                     }
                 )),
@@ -304,7 +308,9 @@ impl Workspace {
     ) -> Option<PaneId> {
         match kind {
             PaneKind::Agent => Some(self.new_agent_pane(target, prompt, resume, true, window, cx)),
-            PaneKind::Terminal | PaneKind::File => self.new_factory_pane(kind, target, window, cx),
+            PaneKind::Terminal | PaneKind::File | PaneKind::History => {
+                self.new_factory_pane(kind, target, window, cx)
+            }
         }
     }
 
@@ -335,6 +341,10 @@ impl Workspace {
                 let path = saved.path.clone().filter(|p| p.is_file())?;
                 PaneFactories::get(cx).file.as_ref()?;
                 self.new_factory_pane(PaneKind::File, path, window, cx)
+            }
+            PaneKind::History => {
+                PaneFactories::get(cx).history.as_ref()?;
+                self.new_factory_pane(PaneKind::History, cwd, window, cx)
             }
         }
     }

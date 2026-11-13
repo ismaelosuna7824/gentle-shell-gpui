@@ -519,6 +519,14 @@ impl Workspace {
         self.place_preview(id, window, cx);
     }
 
+    /// The Commit History of the repository `cwd` is in, as a pane placed
+    /// like a preview: it takes the place of the tab's history pane, if any.
+    pub fn open_history(&mut self, cwd: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(id) = self.new_factory_pane(PaneKind::History, cwd, window, cx) {
+            self.place_preview(id, window, cx);
+        }
+    }
+
     /// Open `path` in a new split right of the focused pane (its own tab when
     /// there is no room), or like [`Self::open_file`] in an empty workspace.
     pub fn open_file_beside(&mut self, path: PathBuf, window: &mut Window, cx: &mut Context<Self>) {

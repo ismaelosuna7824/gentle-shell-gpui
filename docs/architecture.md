@@ -54,7 +54,7 @@ flowchart TD
 | `fuzzy`: fuzzy scoring and file ranking | `palette/`: walking files, reading branches with git. |
 | `ides`: code editors and IDEs (VS Code and its forks, Zed, Sublime Text, Xcode, Visual Studio, Android Studio, JetBrains, …), where each installs per OS, versioned-folder matching and the launch command | `platform/ides.rs`: probing those folders and the PATH, launching the editor; `files/tree.rs`: the ⋯ menu's "Open in …". |
 | `sessions`: session summary, folder name from cwd, ordering, ISO dates and relative time | `sessions/`: finding and reading `.jsonl` files (line scanning is tied to reading), cache. |
-| `git`: status parsers (v1 and v2), numstat, refs, stash, worktrees (and where a new one goes), submodules, ahead/behind; diff trimming | `git/`: running `git`, counting lines of untracked files, stage, commit, push and branch operations. |
+| `git`: status parsers (v1 and v2), numstat, refs, stash, worktrees (and where a new one goes), submodules, ahead/behind; `log` records and the commit graph's lanes; diff trimming | `git/`: running `git`, counting lines of untracked files, stage, commit, push and branch operations, reading a branch's history; `history/`: the Commit History pane and painting the graph. |
 | `version`: stable versions, comparison and Gentle Shell update offer | `updates/`: launcher cache, npm query, clock. |
 | `engram`: observation model and query encoding | `memory/`: HTTP requests to Engram. |
 | `workspaces`: unique workspace names | `workspaces/`: saved model (uses `PaneTree`), reading and writing `workspaces.json`. |
@@ -70,7 +70,7 @@ crates/
 │       ├── cli.rs               # arguments (`[FOLDER] [-p TEXT]`) and initial folder
 │       ├── features/            # one folder per feature; its entry point is mod.rs
 │       │   ├── session/  workspace/  workspaces/  sessions/  palette/  profiles/  settings/  usage/  setup/
-│       │   ├── browser/  devices/  music/  files/  terminal/  git/  providers/  memory/  onboarding/  notices/  alerts/  hydration/  docs/
+│       │   ├── browser/  devices/  music/  files/  terminal/  git/  history/  providers/  memory/  onboarding/  notices/  alerts/  hydration/  docs/
 │       │   └── app_update/  updates/  welcome/
 │       ├── platform/            # OS integration: single instance, agent command shims, Dock and window icons, installed editors
 │       └── shared/              # pieces used by several features, with no logic of their own:
@@ -112,7 +112,7 @@ session/
 ├── submit.rs       # composer submission: `!` shell, built-ins, native screens and attachments
 ├── agents.rs       # agents panel
 ├── builtins.rs     # command classification and capture of extension output (pure)
-├── attachments.rs  # image validation, tokens and payload (pure)
+├── attachments.rs  # image validation and payload, long pastes, `[Image #N]` / `[Pasted text #N]` tokens (pure)
 └── view.rs, view/  # render (see below)
 ```
 
@@ -210,7 +210,10 @@ git/mod.rs           # run git, toplevel; re-exports the types callers use
 git/
 ├── snapshot.rs     # changes for the panel and the tree
 ├── changes.rs      # Changes tab: stage, discard, stash, commit, push
-└── refs.rs         # Branches tab: branches, stash, remote checkout, worktrees (add, remove, prune)
+├── refs.rs         # Branches tab: branches, stash, remote checkout, worktrees (add, remove, prune)
+└── log.rs          # Commit History: a branch's commits, total, local branches, dirty work tree
+
+history/            # mod.rs: HistoryView (a `PaneKind::History` pane), paging, selection; graph.rs (paints a row's lanes), view.rs (rows, hover card)
 
 app_update/mod.rs    # AppUpdate (Global), Status, Problem; check, install, skip, restart
 app_update/

@@ -30,6 +30,7 @@ pub enum PaletteAction {
     Usage,
     Memory,
     Docs,
+    History,
     Devices,
     Settings,
     /// The onboarding screen: dependency checks and installs.

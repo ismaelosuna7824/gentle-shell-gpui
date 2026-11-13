@@ -78,6 +78,8 @@ gpui_kit::assets::icon_assets!(
         Cloud,
         FolderGit,
         GitCommitHorizontal,
+        // Commit History.
+        GitGraph,
         // Effort levels (off, minimal, low, high; Brain, Zap and Flame above).
         Moon,
         Feather,

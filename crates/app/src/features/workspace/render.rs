@@ -1,6 +1,10 @@
 //! `Render` for the workspace window.
 
 use super::*;
+use gpui_kit::component::Selectable as _;
+
+/// The title bar's height; overlay screens open below it.
+const TITLE_BAR_HEIGHT: f32 = 36.;
 
 impl Render for Workspace {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -73,7 +77,7 @@ impl Render for Workspace {
             .top(px(shake_y))
             .child(
                 TitleBar::new()
-                    .h(px(36.))
+                    .h(px(TITLE_BAR_HEIGHT))
                     .bg(gpui_kit::transparent_black())
                     .child(
                         h_flex()
@@ -324,56 +328,72 @@ impl Render for Workspace {
                                         )
                                     })
                                     .when(!narrow, |d| {
-                                        d.child(
-                                            Button::new("open-settings")
+                                        // The screens stay reachable while one is open
+                                        // (they open below the title bar): a button opens
+                                        // its screen in place of the current one, and the
+                                        // open screen's button is lit and closes it.
+                                        type Open = fn(
+                                            &mut Workspace,
+                                            &mut Window,
+                                            &mut Context<Workspace>,
+                                        );
+                                        let button = |id: &'static str,
+                                                      icon: IconName,
+                                                      tip: &'static str,
+                                                      open_now: bool,
+                                                      open: Open| {
+                                            Button::new(id)
                                                 .ghost()
                                                 .xsmall()
-                                                .icon(Icon::new(IconName::Settings))
-                                                .tooltip("Configuration")
-                                                .on_click(cx.listener(|this, _, window, cx| {
-                                                    this.open_settings(window, cx)
-                                                })),
-                                        )
-                                        .child(
-                                            Button::new("open-profiles")
-                                                .ghost()
-                                                .xsmall()
-                                                .icon(Icon::new(IconName::Layers))
-                                                .tooltip("Profiles: model and effort per agent")
-                                                .on_click(cx.listener(|this, _, window, cx| {
-                                                    this.open_profiles(window, cx)
-                                                })),
-                                        )
-                                        .child(
-                                            Button::new("open-memory")
-                                                .ghost()
-                                                .xsmall()
-                                                .icon(Icon::new(IconName::Brain))
-                                                .tooltip("Memory (Engram)")
-                                                .on_click(cx.listener(|this, _, window, cx| {
-                                                    this.open_memory(window, cx)
-                                                })),
-                                        )
-                                        .child(
-                                            Button::new("open-sessions")
-                                                .ghost()
-                                                .xsmall()
-                                                .icon(Icon::new(IconName::RotateCcwClock))
-                                                .tooltip("Sessions")
-                                                .on_click(cx.listener(|this, _, window, cx| {
-                                                    this.open_sessions(window, cx)
-                                                })),
-                                        )
-                                        .child(
-                                            Button::new("open-providers")
-                                                .ghost()
-                                                .xsmall()
-                                                .icon(Icon::new(IconName::KeyRound))
-                                                .tooltip("Providers and sign-in")
-                                                .on_click(cx.listener(|this, _, window, cx| {
-                                                    this.open_providers(window, cx)
-                                                })),
-                                        )
+                                                .icon(Icon::new(icon))
+                                                .tooltip(tip)
+                                                .selected(open_now)
+                                                .on_click(cx.listener(move |this, _, window, cx| {
+                                                    if open_now {
+                                                        this.close_overlay(window, cx)
+                                                    } else {
+                                                        open(this, window, cx)
+                                                    }
+                                                }))
+                                        };
+                                        let open = |is: fn(&Overlay) -> bool| {
+                                            self.overlay.as_ref().is_some_and(|(o, _)| is(o))
+                                        };
+                                        d.child(button(
+                                            "open-settings",
+                                            IconName::Settings,
+                                            "Configuration",
+                                            open(|o| matches!(o, Overlay::Settings(_))),
+                                            |this, window, cx| this.open_settings(window, cx),
+                                        ))
+                                        .child(button(
+                                            "open-profiles",
+                                            IconName::Layers,
+                                            "Profiles: model and effort per agent",
+                                            open(|o| matches!(o, Overlay::Profiles(_))),
+                                            |this, window, cx| this.open_profiles(window, cx),
+                                        ))
+                                        .child(button(
+                                            "open-memory",
+                                            IconName::Brain,
+                                            "Memory (Engram)",
+                                            open(|o| matches!(o, Overlay::Memory(_))),
+                                            |this, window, cx| this.open_memory(window, cx),
+                                        ))
+                                        .child(button(
+                                            "open-sessions",
+                                            IconName::RotateCcwClock,
+                                            "Sessions",
+                                            open(|o| matches!(o, Overlay::Sessions(_))),
+                                            |this, window, cx| this.open_sessions(window, cx),
+                                        ))
+                                        .child(button(
+                                            "open-providers",
+                                            IconName::KeyRound,
+                                            "Providers and sign-in",
+                                            open(|o| matches!(o, Overlay::Providers(_))),
+                                            |this, window, cx| this.open_providers(window, cx),
+                                        ))
                                     })
                                     .when(has_sidebar, |d| {
                                         d.child(
@@ -430,17 +450,32 @@ impl Render for Workspace {
             )
             .children(self.stages.iter().filter_map(Stage::element))
             .when(devices_floating, |root| root.child(self.devices.clone()))
-            .children(self.overlay.as_ref().map(|(overlay, _)| match overlay {
-                Overlay::Providers(view) => view.clone().into_any_element(),
-                Overlay::Sessions(view) => view.clone().into_any_element(),
-                Overlay::Palette(view) => view.clone().into_any_element(),
-                Overlay::Usage(view) => view.clone().into_any_element(),
-                Overlay::Memory(view) => view.clone().into_any_element(),
-                Overlay::Docs(view) => view.clone().into_any_element(),
-                Overlay::Settings(view) => view.clone().into_any_element(),
-                Overlay::Profiles(view) => view.clone().into_any_element(),
-                Overlay::Onboarding(view) => view.clone().into_any_element(),
-                Overlay::Welcome(view) => view.clone().into_any_element(),
+            .children(self.overlay.as_ref().map(|(overlay, _)| {
+                let (view, full_window) = match overlay {
+                    Overlay::Providers(view) => (view.clone().into_any_element(), false),
+                    Overlay::Sessions(view) => (view.clone().into_any_element(), false),
+                    Overlay::Palette(view) => (view.clone().into_any_element(), false),
+                    Overlay::Usage(view) => (view.clone().into_any_element(), false),
+                    Overlay::Memory(view) => (view.clone().into_any_element(), false),
+                    Overlay::Docs(view) => (view.clone().into_any_element(), false),
+                    Overlay::Settings(view) => (view.clone().into_any_element(), false),
+                    Overlay::Profiles(view) => (view.clone().into_any_element(), false),
+                    // First-run screens still cover the whole window.
+                    Overlay::Onboarding(view) => (view.clone().into_any_element(), true),
+                    Overlay::Welcome(view) => (view.clone().into_any_element(), true),
+                };
+                if full_window {
+                    return view;
+                }
+                // Below the title bar, so its buttons can switch screens.
+                div()
+                    .absolute()
+                    .top(px(TITLE_BAR_HEIGHT))
+                    .left_0()
+                    .right_0()
+                    .bottom_0()
+                    .child(view)
+                    .into_any_element()
             }))
             .when_some(self.surge, |root, (run, _, level)| {
                 root.child(crate::shared::surge::overlay(run, level))

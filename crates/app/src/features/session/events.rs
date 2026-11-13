@@ -265,6 +265,8 @@ impl SessionView {
             UiMethod::SetEditorText { text } => {
                 self.composer
                     .update(cx, |state, cx| state.set_value(text, window, cx));
+                // The whole text was replaced: no paste's token is left in it.
+                self.pasted.clear();
             }
             _ => {}
         }

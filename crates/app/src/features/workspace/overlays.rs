@@ -84,6 +84,10 @@ impl Workspace {
             PaletteAction::Usage => self.open_usage(window, cx),
             PaletteAction::Memory => self.open_memory(window, cx),
             PaletteAction::Docs => self.open_docs(window, cx),
+            PaletteAction::History => {
+                let cwd = self.active_cwd(cx);
+                self.open_history(cwd, window, cx)
+            }
             PaletteAction::Devices => self.devices.update(cx, |panel, cx| panel.show(cx)),
             PaletteAction::Settings => self.open_settings(window, cx),
             PaletteAction::Setup => self.open_onboarding(None, window, cx),
