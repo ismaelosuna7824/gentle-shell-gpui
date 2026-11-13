@@ -97,12 +97,11 @@ impl SessionView {
             },
         );
         self.refresh_thinking_levels(cx);
-        self.request(json!({"type": "get_commands"}), cx, |this, result, _| {
+        self.request(json!({"type": "get_commands"}), cx, |this, result, cx| {
             if let Some(data) = this.report(result) {
-                this.commands = data["commands"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
+                let commands = data["commands"].as_array().into_iter().flatten();
+                this.commands = commands
+                    .clone()
                     .filter_map(|c| {
                         Some((
                             c["name"].as_str()?.to_string(),
@@ -110,6 +109,22 @@ impl SessionView {
                         ))
                     })
                     .collect();
+                // Where each skill lives: `SKILL.md`, or its folder.
+                this.skill_dirs = commands
+                    .filter(|c| c["source"] == "skill")
+                    .filter_map(|c| {
+                        let name = c["name"].as_str()?.strip_prefix("skill:")?;
+                        let path = PathBuf::from(c["sourceInfo"]["path"].as_str()?);
+                        let dir = if path.ends_with("SKILL.md") {
+                            path.parent()?.to_path_buf()
+                        } else {
+                            path
+                        };
+                        Some((name.to_string(), dir))
+                    })
+                    .collect();
+                // The window shows which skills an agent has (Architecture docs).
+                this.sync_chrome(cx);
             }
         });
         self.request(json!({"type": "get_messages"}), cx, |this, result, _| {

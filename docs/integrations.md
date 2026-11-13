@@ -10,7 +10,7 @@ How Gentle Shell GPUI connects to Gentle Shell (the `gentle-shell --mode rpc` ba
 | Launcher and PATH resolution | `crates/pi-rpc/src/launch.rs` | File system, login shell |
 | Homes and config folder | `crates/pi-rpc/src/home.rs` | File system |
 | Provider sign-in | `crates/pi-rpc/src/login.rs`, `login-helper.mjs`, `features/providers/` | Node process, JSONL |
-| Launcher subcommands (`upgrade`, `install`, `remove`, `setup`) | `features/settings/upgrade.rs`, `settings/packages.rs`, `setup/gentle.rs` | Child process |
+| Launcher subcommands (`upgrade`, `install`, `remove`, `setup`) | `features/settings/upgrade.rs`, `settings/packages.rs` and `docs/` (through `setup::run_gentle_shell`), `setup/gentle.rs` | Child process |
 | Engram (memory) | `features/memory/client.rs`, `gentle_core::engram` | Local HTTP |
 | Maestro (UI testing tools for the agent) | `features/settings/maestro.rs` (the section), `features/setup/maestro.rs`, `setup/fetch.rs` | Downloads into the toolchain; `gentle-shell mcp add` |
 | Music (gentle-stream) | `features/music/`, `features/settings/music.rs`, `features/setup/music.rs`, `gentle_core::music` | Unix socket (`multiprocessing.connection`); a Python helper in the player's environment |

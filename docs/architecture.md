@@ -49,6 +49,8 @@ flowchart TD
 | `usage`: subscription window models and parsers (Codex, NaN), grouping, account claim; session records, statistics aggregation, ISO dates and civil days | `usage/`: reading `auth.json`, resolving keys (`$VAR`, `!command`), HTTP requests, walking and caching session files, clock and local time offset. |
 | `profiles`: routing model, `profiles.json` format, pins, agent frontmatter, notes | `profiles/`: homes and agent discovery, atomic writes, saved and materialized routing, Pi settings, pin and worktree files, Make default. |
 | `hydration`: the water reminder's settings (`hydration` in the app's `settings.json`) and when the next one is due | `hydration/`: the clock from launch, the timer, saving the setting, the drops animation. |
+| `markdown`: where the Mermaid blocks are in a document | `files/mermaid.rs`: drawing them with merman's CLI (installed on demand by `setup`), measured with the system sans font, light or dark theme, and swapping them for images in the preview. |
+| `docs`: the skill's `docs-check` report, each document's standing and front-matter title | `docs/`: the Architecture docs screen, installing the skill (`gentle-shell install`), running `docs-check` with Node, listing `docs/`. |
 | `fuzzy`: fuzzy scoring and file ranking | `palette/`: walking files, reading branches with git. |
 | `sessions`: session summary, folder name from cwd, ordering, ISO dates and relative time | `sessions/`: finding and reading `.jsonl` files (line scanning is tied to reading), cache. |
 | `git`: status parsers (v1 and v2), numstat, refs, stash, worktrees (and where a new one goes), submodules, ahead/behind; diff trimming | `git/`: running `git`, counting lines of untracked files, stage, commit, push and branch operations. |
@@ -67,7 +69,7 @@ crates/
 │       ├── cli.rs               # arguments (`[FOLDER] [-p TEXT]`) and initial folder
 │       ├── features/            # one folder per feature; its entry point is mod.rs
 │       │   ├── session/  workspace/  workspaces/  sessions/  palette/  profiles/  settings/  usage/  setup/
-│       │   ├── browser/  devices/  music/  files/  terminal/  git/  providers/  memory/  onboarding/  notices/  alerts/  hydration/
+│       │   ├── browser/  devices/  music/  files/  terminal/  git/  providers/  memory/  onboarding/  notices/  alerts/  hydration/  docs/
 │       │   └── app_update/  updates/  welcome/
 │       ├── platform/            # OS integration: single instance, agent command shims, Dock and window icons
 │       └── shared/              # pieces used by several features, with no logic of their own:
@@ -279,3 +281,4 @@ Before completing a stage, run formatting, tests, Clippy and a smoke test of the
 - [ADR-0001: Modular monolith by feature](adr/0001-modular-monolith.md)
 - [ADR-0002: Incremental pure core](adr/0002-incremental-pure-core.md)
 - [ADR-0003: Behavior-preserving refactors](adr/0003-behavior-preserving-refactors.md)
+- [ADR-0004: Draw Mermaid diagrams with merman's CLI, downloaded on demand](adr/0004-native-mermaid-rendering.md)

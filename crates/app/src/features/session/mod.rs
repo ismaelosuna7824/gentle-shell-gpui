@@ -74,6 +74,7 @@ struct Chrome {
     needs_you: bool,
     session_file: Option<PathBuf>,
     models: u64,
+    skills: usize,
 }
 
 pub struct SessionView {
@@ -113,6 +114,8 @@ pub struct SessionView {
     models: state::Models,
     usage: state::Usage,
     commands: Vec<(String, String)>,
+    /// Each skill's folder, by name (without `skill:`).
+    skill_dirs: Vec<(String, PathBuf)>,
     session_name: Option<String>,
     session_file: Option<PathBuf>,
     title: Option<String>,
@@ -259,6 +262,7 @@ impl SessionView {
             usage: state::Usage::default(),
             pane_width: std::rc::Rc::new(std::cell::Cell::new(10_000.)),
             commands: Vec::new(),
+            skill_dirs: Vec::new(),
             session_name: None,
             session_file: None,
             title: None,
@@ -328,6 +332,14 @@ impl SessionView {
             .collect()
     }
 
+    /// Where skill `name` lives, if this tab's Gentle Shell has it.
+    pub fn skill_dir(&self, name: &str) -> Option<PathBuf> {
+        self.skill_dirs
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, dir)| dir.clone())
+    }
+
     /// The conversation this tab shows: a resume still in flight (or waiting
     /// for the backend to start) wins over the live session file.
     pub fn session_file(&self) -> Option<PathBuf> {
@@ -364,6 +376,7 @@ impl SessionView {
             needs_you: self.needs_you(),
             session_file: self.session_file(),
             models: self.models.rev,
+            skills: self.skill_dirs.len(),
         };
         if self.chrome.as_ref() != Some(&chrome) {
             self.chrome = Some(chrome);

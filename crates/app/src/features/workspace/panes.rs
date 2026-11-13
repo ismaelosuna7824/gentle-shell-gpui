@@ -136,6 +136,11 @@ impl Workspace {
                         pane.session_file = file;
                         this.schedule_save(cx);
                     }
+                    // An agent that just started may have the docs skill.
+                    if let Some((Overlay::Docs(view), _)) = &this.overlay {
+                        let (view, dir) = (view.clone(), this.docs_skill_dir(cx));
+                        view.update(cx, |view, cx| view.set_skill_dir(dir, cx));
+                    }
                     if changed {
                         // An open switcher lists every workspace's activity.
                         if let Some((Overlay::Palette(view), _)) = &this.overlay {

@@ -49,6 +49,12 @@ pub(super) fn screen_rows() -> Vec<Row> {
             PaletteAction::Memory,
         ),
         row(
+            IconName::BookOpen,
+            "Architecture docs",
+            "ADRs, C4, data, states and flows, written and kept current by the agent",
+            PaletteAction::Docs,
+        ),
+        row(
             IconName::Smartphone,
             "Devices",
             "Launch an Android emulator or iOS simulator and watch it",

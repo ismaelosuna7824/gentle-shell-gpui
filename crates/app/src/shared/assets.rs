@@ -53,6 +53,12 @@ gpui_kit::assets::icon_assets!(
         Paperclip,
         // Configuration → Water reminder.
         Droplets,
+        // Architecture docs and the diagram renderer.
+        BookOpen,
+        FileText,
+        NotebookPen,
+        Workflow,
+        Download,
         // File tree header and context menu.
         FilePlus,
         FolderPlus,
