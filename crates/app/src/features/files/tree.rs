@@ -122,6 +122,8 @@ pub enum FileTreeEvent {
     InsertPath(String),
     /// Open an agent tab in this folder (a worktree).
     OpenAgent(PathBuf),
+    /// Show the Commit History of this repository.
+    OpenHistory(PathBuf),
     /// The header's collapse button: the owner should hide the sidebar.
     Collapse,
 }
@@ -224,6 +226,7 @@ impl FileTreeView {
             }),
             cx.subscribe(&refs, |_, _, event: &RefsEvent, cx| match event {
                 RefsEvent::OpenAgent(path) => cx.emit(FileTreeEvent::OpenAgent(path.clone())),
+                RefsEvent::OpenHistory(path) => cx.emit(FileTreeEvent::OpenHistory(path.clone())),
                 RefsEvent::Changed => cx.notify(),
             }),
         ];

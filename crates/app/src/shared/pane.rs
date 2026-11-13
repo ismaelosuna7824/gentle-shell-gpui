@@ -25,6 +25,8 @@ pub enum PaneKind {
     Agent,
     Terminal,
     File,
+    /// A repository's Commit History ([`crate::features::history::HistoryView`]).
+    History,
 }
 
 impl PaneKind {
@@ -33,6 +35,7 @@ impl PaneKind {
             PaneKind::Agent => IconName::Bot,
             PaneKind::Terminal => IconName::SquareTerminal,
             PaneKind::File => IconName::FileText,
+            PaneKind::History => IconName::GitGraph,
         }
     }
 }
@@ -52,7 +55,7 @@ pub struct PaneItem {
 /// Reads a pane's "has unsaved edits" state.
 pub type UnsavedProbe = Rc<dyn Fn(&App) -> bool>;
 
-/// Builds a pane for a folder (terminal) or a file (file viewer).
+/// Builds a pane for a folder (terminal, history) or a file (file viewer).
 pub type PaneFactory = Rc<dyn Fn(PathBuf, &mut Window, &mut App) -> PaneItem>;
 
 /// Pane kinds other modules provide; a `None` factory makes the actions that
@@ -63,6 +66,8 @@ pub struct PaneFactories {
     pub file: Option<PaneFactory>,
     /// A file's changes against HEAD (saved and restored as a file pane).
     pub diff: Option<PaneFactory>,
+    /// Commit History of the repository a folder is in.
+    pub history: Option<PaneFactory>,
 }
 
 impl Global for PaneFactories {}

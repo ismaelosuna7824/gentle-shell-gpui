@@ -7,6 +7,7 @@ pub mod devices;
 pub mod docs;
 pub mod files;
 pub mod git;
+pub mod history;
 pub mod hydration;
 pub mod memory;
 pub mod music;
