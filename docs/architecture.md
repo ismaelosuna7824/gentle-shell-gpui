@@ -52,6 +52,7 @@ flowchart TD
 | `markdown`: where the Mermaid blocks are in a document | `files/mermaid.rs`: drawing them with merman's CLI (installed on demand by `setup`), measured with the system sans font, light or dark theme, and swapping them for images in the preview. |
 | `docs`: the skill's `docs-check` report, each document's standing and front-matter title | `docs/`: the Architecture docs screen, installing the skill (`gentle-shell install`), running `docs-check` with Node, listing `docs/`. |
 | `fuzzy`: fuzzy scoring and file ranking | `palette/`: walking files, reading branches with git. |
+| `ides`: code editors and IDEs (VS Code and its forks, Zed, Sublime Text, Xcode, Visual Studio, Android Studio, JetBrains, …), where each installs per OS, versioned-folder matching and the launch command | `platform/ides.rs`: probing those folders and the PATH, launching the editor; `files/tree.rs`: the ⋯ menu's "Open in …". |
 | `sessions`: session summary, folder name from cwd, ordering, ISO dates and relative time | `sessions/`: finding and reading `.jsonl` files (line scanning is tied to reading), cache. |
 | `git`: status parsers (v1 and v2), numstat, refs, stash, worktrees (and where a new one goes), submodules, ahead/behind; diff trimming | `git/`: running `git`, counting lines of untracked files, stage, commit, push and branch operations. |
 | `version`: stable versions, comparison and Gentle Shell update offer | `updates/`: launcher cache, npm query, clock. |
@@ -71,7 +72,7 @@ crates/
 │       │   ├── session/  workspace/  workspaces/  sessions/  palette/  profiles/  settings/  usage/  setup/
 │       │   ├── browser/  devices/  music/  files/  terminal/  git/  providers/  memory/  onboarding/  notices/  alerts/  hydration/  docs/
 │       │   └── app_update/  updates/  welcome/
-│       ├── platform/            # OS integration: single instance, agent command shims, Dock and window icons
+│       ├── platform/            # OS integration: single instance, agent command shims, Dock and window icons, installed editors
 │       └── shared/              # pieces used by several features, with no logic of their own:
 │                                # ui, floating, themes, assets, banner, surge, pane, gentle_state
 ├── core/                        # shared pure logic (gentle-core)

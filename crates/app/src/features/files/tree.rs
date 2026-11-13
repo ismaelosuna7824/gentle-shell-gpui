@@ -25,6 +25,7 @@ use super::ops::{self, ClipMode};
 use super::refs::{RefsEvent, RefsView};
 use super::{file_icon, status_color};
 use crate::features::git::GitSnapshot;
+use crate::platform::ides;
 use crate::shared::ui;
 
 const CONTEXT: &str = "FileTree";
@@ -192,6 +193,8 @@ pub struct FileTreeView {
     scroll: UniformListScrollHandle,
     changes: Entity<ChangesView>,
     refs: Entity<RefsView>,
+    /// Code editors installed here, for the ⋯ menu's "Open in …".
+    ides: Rc<Vec<ides::Installed>>,
     _poll: Task<()>,
     _subscriptions: Vec<Subscription>,
 }
@@ -243,11 +246,20 @@ impl FileTreeView {
             scroll: UniformListScrollHandle::new(),
             changes,
             refs,
+            ides: Rc::default(),
             _poll: Task::ready(()),
             _subscriptions: subscriptions,
         };
         this.sync_panels(cx);
         this.load_dir(this.root.clone(), cx);
+        cx.spawn(async move |this, cx| {
+            let found = cx
+                .background_executor()
+                .spawn(async { ides::detect() })
+                .await;
+            let _ = this.update(cx, |this, _| this.ides = Rc::new(found));
+        })
+        .detach();
         this._poll = cx.spawn_in(window, async move |this, cx| {
             loop {
                 // The status decorates the Files tab: only while it is shown
@@ -1319,7 +1331,8 @@ impl FileTreeView {
             }
         };
         let root = self.root.clone();
-        menu.min_w(px(220.))
+        let menu = menu
+            .min_w(px(220.))
             .item(
                 PopupMenuItem::new("Refresh")
                     .icon(Icon::new(IconName::RefreshCw))
@@ -1333,14 +1346,37 @@ impl FileTreeView {
             .item(
                 PopupMenuItem::new(REVEAL)
                     .icon(Icon::new(IconName::FolderInput))
-                    .on_click(move |_, _, cx| cx.reveal_path(&root)),
+                    .on_click({
+                        let root = root.clone();
+                        move |_, _, cx| cx.reveal_path(&root)
+                    }),
             )
-            .separator()
-            .item(
-                PopupMenuItem::new("Show Ignored Files")
-                    .checked(self.show_ignored)
-                    .on_click(act(Self::toggle_ignored)),
+            .separator();
+        let menu = self.ides.iter().fold(menu, |menu, ide| {
+            let (ide, root) = (ide.clone(), root.clone());
+            menu.item(
+                PopupMenuItem::new(format!("Open in {}", ide.name))
+                    .icon(Icon::new(IconName::CodeXml))
+                    .on_click(move |_, window, cx| {
+                        if let Err(err) = ides::open(&ide, &root) {
+                            window.push_notification(
+                                Notification::error(format!("Couldn't open {}: {err}", ide.name)),
+                                cx,
+                            );
+                        }
+                    }),
             )
+        });
+        let menu = if self.ides.is_empty() {
+            menu
+        } else {
+            menu.separator()
+        };
+        menu.item(
+            PopupMenuItem::new("Show Ignored Files")
+                .checked(self.show_ignored)
+                .on_click(act(Self::toggle_ignored)),
+        )
     }
 
     fn header_button(id: &'static str, icon: IconName, tooltip: &'static str) -> Button {
