@@ -98,6 +98,9 @@ pub struct SessionView {
     composer_len: usize,
     /// Images waiting to go with the next prompt; `[Image #N]` is the N-th.
     attachments: Vec<attachments::Attachment>,
+    /// Long pastes waiting to go with the next prompt, each sent in place
+    /// of its `[Pasted text #N]` token: the N-th is `pasted[N - 1]`.
+    pasted: Vec<attachments::PastedText>,
     /// Decoded conversation images, by data hash.
     image_cache: attachments::ImageCache,
     extension: state::ExtensionUi,
@@ -180,6 +183,7 @@ impl SessionView {
                 |this, _, event: &InputEvent, window, cx| match event {
                     InputEvent::PressEnter { shift: false, .. } => this.submit(window, cx),
                     InputEvent::Change => {
+                        this.sync_pasted(window, cx);
                         this.blow_kiss(cx);
                         cx.notify();
                     }
@@ -246,6 +250,7 @@ impl SessionView {
             kisses_blown: 0,
             composer_len: 0,
             attachments: Vec::new(),
+            pasted: Vec::new(),
             image_cache: attachments::ImageCache::default(),
             extension: state::ExtensionUi::default(),
             dialog_input,

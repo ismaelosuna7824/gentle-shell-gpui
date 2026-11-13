@@ -112,7 +112,7 @@ session/
 ├── submit.rs       # composer submission: `!` shell, built-ins, native screens and attachments
 ├── agents.rs       # agents panel
 ├── builtins.rs     # command classification and capture of extension output (pure)
-├── attachments.rs  # image validation, tokens and payload (pure)
+├── attachments.rs  # image validation and payload, long pastes, `[Image #N]` / `[Pasted text #N]` tokens (pure)
 └── view.rs, view/  # render (see below)
 ```
 
