@@ -55,6 +55,12 @@ pub(super) fn screen_rows() -> Vec<Row> {
             PaletteAction::Docs,
         ),
         row(
+            IconName::GitGraph,
+            "Commit history",
+            "The branch's commits as a graph, with authors, tags and changes",
+            PaletteAction::History,
+        ),
+        row(
             IconName::Smartphone,
             "Devices",
             "Launch an Android emulator or iOS simulator and watch it",

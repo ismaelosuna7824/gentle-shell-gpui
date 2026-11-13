@@ -8,7 +8,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use gpui_kit::assets::IconName;
-use gpui_kit::component::button::ButtonVariant;
+use gpui_kit::component::button::{Button, ButtonVariant, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::menu::{ContextMenuExt as _, PopupMenuItem};
 use gpui_kit::component::scroll::ScrollableElement as _;
@@ -29,6 +29,8 @@ pub enum RefsEvent {
     Changed,
     /// Open an agent tab in this worktree's folder.
     OpenAgent(PathBuf),
+    /// Show this repository's Commit History.
+    OpenHistory(PathBuf),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -804,8 +806,10 @@ impl RefsView {
         .into_any_element()
     }
 
-    fn render_footer(&self) -> Option<Div> {
-        let head = &self.snapshot()?.refs.head;
+    fn render_footer(&self, cx: &mut Context<Self>) -> Option<Div> {
+        let repo = self.snapshot()?;
+        let head = &repo.refs.head;
+        let toplevel = repo.toplevel.clone();
         let title = match (&head.branch, &head.sha) {
             (Some(branch), _) => branch.clone(),
             (None, Some(sha)) => format!("Detached at {sha}"),
@@ -848,7 +852,17 @@ impl RefsView {
                                 .text_color(ui::fg())
                                 .child(title),
                         )
-                        .child(ahead_behind(head.ahead, head.behind)),
+                        .child(ahead_behind(head.ahead, head.behind))
+                        .child(
+                            Button::new("refs-history")
+                                .ghost()
+                                .xsmall()
+                                .icon(Icon::new(IconName::GitGraph))
+                                .tooltip("Commit history")
+                                .on_click(cx.listener(move |_, _, _, cx| {
+                                    cx.emit(RefsEvent::OpenHistory(toplevel.clone()))
+                                })),
+                        ),
                 )
                 .child(
                     div()
@@ -893,7 +907,7 @@ impl Render for RefsView {
                         .child(error),
                 )
             })
-            .children(self.render_footer())
+            .children(self.render_footer(cx))
     }
 }
 
