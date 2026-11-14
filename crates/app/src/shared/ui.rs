@@ -359,6 +359,16 @@ pub fn chip(text: impl Into<SharedString>, color: Hsla) -> Div {
         .child(text.into())
 }
 
+/// A provider's dot color in model pickers: stable per provider name, from
+/// the theme's tones.
+pub fn provider_color(provider: &str) -> Hsla {
+    let palette = [petal(), info(), success(), champagne(), warning()];
+    let hash = provider
+        .bytes()
+        .fold(0usize, |h, b| h.wrapping_mul(31).wrapping_add(b as usize));
+    palette[hash % palette.len()]
+}
+
 /// A key cap for shortcut hints (`esc`, `↵`, `⌘`). Use [`key_button`] when the
 /// hint stands for one action the user could click.
 pub fn kbd(text: impl Into<SharedString>) -> Div {

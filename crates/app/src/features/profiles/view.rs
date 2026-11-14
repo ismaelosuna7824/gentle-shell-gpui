@@ -16,6 +16,7 @@ use super::{Leave, ProfilesView};
 mod cells;
 mod confirm;
 mod footer;
+mod model_menu;
 mod profile_list;
 mod table;
 

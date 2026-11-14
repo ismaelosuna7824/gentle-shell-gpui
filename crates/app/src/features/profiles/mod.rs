@@ -119,6 +119,12 @@ pub struct ProfilesView {
     custom_target: Option<String>,
     custom_input: Entity<InputState>,
     confirm: Option<Confirm>,
+    /// The route row whose model picker is open, and the picker's search,
+    /// highlighted row and scroll.
+    model_menu: Option<String>,
+    model_search: Entity<InputState>,
+    model_cursor: usize,
+    model_scroll: ScrollHandle,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -133,7 +139,29 @@ impl ProfilesView {
     ) -> Self {
         let name_input = cx.new(|cx| InputState::new(window, cx).placeholder("profile-name"));
         let custom_input = cx.new(|cx| InputState::new(window, cx).placeholder("provider/model"));
+        let model_search =
+            cx.new(|cx| InputState::new(window, cx).placeholder("Search models or providers…"));
+        let weak = cx.entity().downgrade();
         let subscriptions = vec![
+            cx.subscribe(&model_search, |this, _, event: &InputEvent, cx| {
+                if let InputEvent::Change = event {
+                    this.model_cursor = 0;
+                    this.model_scroll.scroll_to_item(0);
+                    cx.notify();
+                }
+            }),
+            // ↑/↓/Enter/Esc in the open picker beat its focused search field
+            // and the workspace's Esc, which would close the whole screen.
+            cx.intercept_keystrokes(move |event, window, cx| {
+                let consumed = weak
+                    .update(cx, |this, cx| {
+                        this.model_menu_key(&event.keystroke, window, cx)
+                    })
+                    .unwrap_or(false);
+                if consumed {
+                    cx.stop_propagation();
+                }
+            }),
             cx.subscribe_in(
                 &name_input,
                 window,
@@ -174,6 +202,10 @@ impl ProfilesView {
             custom_target: None,
             custom_input,
             confirm: None,
+            model_menu: None,
+            model_search,
+            model_cursor: 0,
+            model_scroll: ScrollHandle::new(),
             _subscriptions: subscriptions,
         };
         this.reload(cx);

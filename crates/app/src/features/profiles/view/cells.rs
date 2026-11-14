@@ -1,7 +1,8 @@
-//! The route table's model, effort and tier cells and their menus.
+//! The route table's model, effort and tier cells and their menus; the
+//! model picker itself is `model_menu`.
 
 use gentle_core::profiles::{
-    ORCHESTRATOR, RouteEntry, THINKING_LEVELS, clamp_level, is_review_role, normalize_model_id,
+    ORCHESTRATOR, RouteEntry, THINKING_LEVELS, clamp_level, is_review_role,
 };
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -15,21 +16,6 @@ use crate::shared::ui;
 
 use super::{EFFORT_W, TIER_W};
 
-/// A two-line menu entry: the label over a muted detail.
-fn menu_entry(label: &SharedString, detail: &SharedString) -> Div {
-    v_flex()
-        .min_w_0()
-        .py_0p5()
-        .child(div().text_sm().text_color(ui::fg()).child(label.clone()))
-        .child(
-            div()
-                .text_xs()
-                .font_family(ui::MONO)
-                .text_color(ui::muted())
-                .child(detail.clone()),
-        )
-}
-
 impl ProfilesView {
     pub(in crate::features::profiles) fn inherit_label(&self, key: &str) -> &'static str {
         match key {
@@ -42,7 +28,7 @@ impl ProfilesView {
 
     /// The value one row shows; the every-agent row shows the shared value or
     /// "mixed".
-    fn current_value(
+    pub(super) fn current_value(
         &self,
         key: &str,
         field: fn(&RouteEntry) -> &Option<String>,
@@ -71,8 +57,6 @@ impl ProfilesView {
     }
 
     pub(super) fn render_model_cell(&self, key: &str, cx: &mut Context<Self>) -> AnyElement {
-        let weak = cx.entity().downgrade();
-        let models = self.models.clone();
         let current = self.current_value(key, |e| &e.model);
         let inherit = self.inherit_label(key);
         let label = match &current {
@@ -89,72 +73,22 @@ impl ProfilesView {
         } else {
             ui::muted()
         };
-        let key = key.to_string();
-        let current = current.ok().flatten();
+        let trigger = Button::new(SharedString::from(format!("model-{key}")))
+            .ghost()
+            .xsmall()
+            .w_full()
+            .font_family(ui::MONO)
+            .text_color(color)
+            .label(label)
+            .dropdown_caret(true)
+            .disabled(self.busy);
         // A stretched column gives the trigger a definite width, so a long
         // model id ellipsizes instead of spilling into the effort column.
         v_flex()
             .flex_1()
             .min_w_0()
             .overflow_hidden()
-            .child(
-                Button::new(SharedString::from(format!("model-{key}")))
-                    .ghost()
-                    .xsmall()
-                    .w_full()
-                    .font_family(ui::MONO)
-                    .text_color(color)
-                    .label(label)
-                    .dropdown_caret(true)
-                    .disabled(self.busy)
-                    .dropdown_menu(move |mut menu, _, _| {
-                        let pick = |model: Option<String>| {
-                            let weak = weak.clone();
-                            let key = key.clone();
-                            move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
-                                let _ = weak
-                                    .update(cx, |this, cx| this.set_model(&key, model.clone(), cx));
-                            }
-                        };
-                        menu = menu.item(
-                            PopupMenuItem::new(inherit)
-                                .checked(current.is_none())
-                                .on_click(pick(None)),
-                        );
-                        let mut provider = String::new();
-                        for model in models.iter() {
-                            if model.provider != provider {
-                                provider = model.provider.clone();
-                                menu = menu.label(provider.clone());
-                            }
-                            let id = model.route_id();
-                            let Some(id) = normalize_model_id(&id) else {
-                                continue;
-                            };
-                            let name = SharedString::from(model.name.clone());
-                            let model_id = SharedString::from(model.id.clone());
-                            menu = menu.item(
-                                PopupMenuItem::element(move |_, _| menu_entry(&name, &model_id))
-                                    .checked(current.as_deref() == Some(id.as_str()))
-                                    .on_click(pick(Some(id))),
-                            );
-                        }
-                        let weak = weak.clone();
-                        let key = key.clone();
-                        menu.separator()
-                            .item(
-                                PopupMenuItem::new("Custom model id…")
-                                    .icon(Icon::new(IconName::Plus))
-                                    .on_click(move |_, window, cx| {
-                                        let _ = weak.update(cx, |this, cx| {
-                                            this.open_custom(&key, window, cx)
-                                        });
-                                    }),
-                            )
-                            .max_h(px(420.))
-                            .scrollable(true)
-                    }),
-            )
+            .child(self.render_model_menu(key, trigger, inherit, cx))
             .into_any_element()
     }
 
