@@ -144,15 +144,20 @@ const SCENES = {};
 
 // ── The cell/sprite engine (claude-desktop-themes engine.js, MIT) ──────────
 const __put = (px, py, c, sx, sy, t) => {
-  const a = __clamp(c.a ?? 1);
+  const a0 = c.a ?? 1, a = a0 > 1 ? 1 : a0 > 0 ? a0 : 0;
   if (a < .01) return;
-  if (c.bg) __g.rect(px + 2, py + 2, CELL - 4, CELL - 4, c.bg, a, 3);
+  // (inlined: this runs for every cell of every frame)
+  if (c.bg) {
+    const bg = __color(c.bg);
+    __push(1, px + 2, py + 2, CELL - 4, CELL - 4, 3, bg[0], a * bg[1], 0);
+  }
   const ch = c.ch ?? glyph(c.bg ? GLYPHS : LOOSE, sx, sy, t);
   if (ch && c.fg) {
-    const [col, ca] = __color(c.fg);
-    __push(3, px + CELL / 2, py + CELL / 2 + 1, Math.round(CELL * 13 / 22), ch.codePointAt(0), col, __clamp(a * ca), 1, 0);
+    const fg = __color(c.fg);
+    __push(3, px + CELL / 2, py + CELL / 2 + 1, __glyphSize, ch.codePointAt(0), fg[0], a * fg[1], 1, 0);
   }
 };
+let __glyphSize = 13;
 
 const __ascii = (scene, W, H, t) => {
   const cols = Math.ceil(W / CELL), rows = Math.ceil(H / CELL);
@@ -203,6 +208,7 @@ const __frame = (W, H, t, cell) => {
   __g.width = W; __g.height = H; __g.t = t;
   const most = typeof __scene.size === 'number' ? __scene.size : 22;
   CELL = Math.max(8, Math.min(cell, most));
+  __glyphSize = Math.round(CELL * 13 / 22);
   if (__scene.draw) __scene.draw(__g, t);
   if (__scene.cell || __scene.sprites) __ascii(__scene, W, H, t);
   return __n;

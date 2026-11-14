@@ -57,9 +57,11 @@ Built-in scenes: BUILTIN_SCENES.
 ## Scenes
 
 A scene is JavaScript, run sandboxed: no files, network, timers, DOM or
-modules, only computing and drawing. A frame may take at most 250 ms (keep
-it under 10 ms: it runs about 30 times a second), and memory is capped. The
-file registers itself:
+modules, only computing and drawing. A frame may take at most 250 ms and
+memory is capped. The app keeps a scene's script under 8% of one core: a
+frame that takes 3 ms or less runs at 24 fps; a heavier one is shown less
+often (down to 8 fps) and looks choppier, so keep frames cheap. The file
+registers itself:
 
 ```js
 SCENES['rainy-cafe'] = {
@@ -121,7 +123,9 @@ claude-desktop-themes' live wallpapers: their scene files work unchanged.
 - Keep the middle calm: put the big things at the sides and corners; the
   veil softens the middle.
 - Size things by the window (`g.width`, `cols`) so a small window still works.
-- Cheap frames: a few hundred to a few thousand shapes, no per-pixel loops.
+- Cheap frames: a few hundred to a couple of thousand shapes, no per-pixel
+  loops, nothing recomputed that could be computed once at the top of the
+  file (shapes, palettes, paths) and reused.
 
 ## Sharing
 

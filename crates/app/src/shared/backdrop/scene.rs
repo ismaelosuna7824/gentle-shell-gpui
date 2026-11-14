@@ -21,8 +21,14 @@ pub const STRIDE: usize = 10;
 const FRAME_BUDGET: Duration = Duration::from_millis(250);
 /// Memory for the whole JS runtime.
 const MEMORY_LIMIT: usize = 64 << 20;
-/// The frame rate the scene is computed at while it moves.
-const FRAME: Duration = Duration::from_millis(33);
+/// The fastest a scene is computed while it moves: 24 fps, smooth for
+/// ambient motion at a fifth less work than 30.
+const FASTEST: Duration = Duration::from_millis(42);
+/// The slowest a heavy scene drops to: 8 fps.
+const SLOWEST: Duration = Duration::from_millis(125);
+/// The share of one core a scene's script may take; a heavier scene is
+/// computed less often instead of costing more.
+const CPU_SHARE: f64 = 0.08;
 /// Failed frames in a row before the scene is given up.
 const MAX_FAILURES: u32 = 3;
 
@@ -43,6 +49,16 @@ struct Shared {
     moving: AtomicBool,
     /// The scene's thread should end.
     stop: AtomicBool,
+    /// Milliseconds between frames, as the scene's cost allows.
+    interval: AtomicU64,
+    /// The least milliseconds between frames the person allows (Calm).
+    floor: AtomicU64,
+}
+
+/// How long to wait between frames of a scene that takes `cost` each, at
+/// least `floor`.
+fn pace(cost: Duration, floor: Duration) -> Duration {
+    cost.div_f64(CPU_SHARE).clamp(FASTEST, SLOWEST).max(floor)
 }
 
 /// A running scene. Dropping it ends its thread.
@@ -98,6 +114,21 @@ impl Scene {
 
     pub fn set_moving(&self, moving: bool) {
         self.shared.moving.store(moving, Ordering::Relaxed);
+    }
+
+    /// Never compute frames more often than every `floor`.
+    pub fn set_floor(&self, floor: Duration) {
+        self.shared
+            .floor
+            .store(floor.as_millis() as u64, Ordering::Relaxed);
+    }
+
+    /// How often the window should show a new frame.
+    pub fn interval(&self) -> Duration {
+        match self.shared.interval.load(Ordering::Relaxed) {
+            0 => FASTEST,
+            ms => Duration::from_millis(ms),
+        }
     }
 }
 
@@ -213,6 +244,8 @@ fn run(shared: &Shared, setup: Setup) -> Result<(), String> {
     let mut last = Instant::now();
     let mut failures = 0;
     let mut drawn: Option<(f32, f32)> = None;
+    // A running average of what a frame costs.
+    let mut cost = Duration::ZERO;
     while !shared.stop.load(Ordering::Relaxed) {
         let started = Instant::now();
         let size = (
@@ -249,7 +282,18 @@ fn run(shared: &Shared, setup: Setup) -> Result<(), String> {
                 }
             }
         }
-        if let Some(rest) = FRAME.checked_sub(started.elapsed()) {
+        let spent = started.elapsed();
+        cost = if cost.is_zero() {
+            spent
+        } else {
+            (cost * 7 + spent) / 8
+        };
+        let floor = Duration::from_millis(shared.floor.load(Ordering::Relaxed));
+        let interval = pace(cost, floor);
+        shared
+            .interval
+            .store(interval.as_millis() as u64, Ordering::Relaxed);
+        if let Some(rest) = interval.checked_sub(spent) {
             std::thread::sleep(rest);
         }
     }

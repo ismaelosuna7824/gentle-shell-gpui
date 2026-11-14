@@ -762,6 +762,7 @@ pub fn init(cx: &mut App) {
         transparency,
     });
     ui::apply_theme(cx);
+    backdrop::init(cx);
 
     cx.spawn(async move |cx| {
         let gentle = cx

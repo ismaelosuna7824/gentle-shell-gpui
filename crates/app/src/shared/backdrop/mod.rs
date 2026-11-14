@@ -11,6 +11,7 @@ mod scene;
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -129,11 +130,85 @@ struct Slot {
     running: Option<(Arc<str>, String, Scene)>,
 }
 
+/// How much a theme's scene moves, the person's choice in Configuration ›
+/// Theme, saved as `backdropMotion` in the app's settings file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Motion {
+    /// Up to 24 fps.
+    Smooth,
+    /// Up to 12 fps: about half the work of Smooth, and the default.
+    #[default]
+    Calm,
+    /// One still frame: no work while it shows.
+    Still,
+}
+
+impl Motion {
+    const KEY: &str = "backdropMotion";
+    pub const ALL: [Motion; 3] = [Motion::Smooth, Motion::Calm, Motion::Still];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Motion::Smooth => "Smooth",
+            Motion::Calm => "Calm",
+            Motion::Still => "Still",
+        }
+    }
+
+    fn floor(self) -> Duration {
+        match self {
+            Motion::Calm => Duration::from_millis(83),
+            Motion::Smooth | Motion::Still => Duration::ZERO,
+        }
+    }
+}
+
+struct MotionChoice(Motion);
+
+impl Global for MotionChoice {}
+
+/// Read the saved motion choice.
+pub fn init(cx: &mut App) {
+    let saved = crate::shared::themes::store_path()
+        .and_then(|path| crate::shared::themes::read_key(&path, Motion::KEY))
+        .and_then(|value| {
+            let name = value.as_str()?.to_string();
+            Motion::ALL
+                .into_iter()
+                .find(|m| m.label().eq_ignore_ascii_case(&name))
+        })
+        .unwrap_or_default();
+    cx.set_global(MotionChoice(saved));
+}
+
+pub fn motion(cx: &App) -> Motion {
+    cx.try_global::<MotionChoice>()
+        .map_or_else(Motion::default, |m| m.0)
+}
+
+/// Choose and save how much scenes move.
+pub fn set_motion(motion: Motion, cx: &mut App) {
+    cx.set_global(MotionChoice(motion));
+    cx.refresh_windows();
+    if let Some(path) = crate::shared::themes::store_path() {
+        cx.background_executor()
+            .spawn(async move {
+                let value = serde_json::Value::String(motion.label().to_ascii_lowercase());
+                let _ = crate::shared::themes::write_key(&path, Motion::KEY, value);
+            })
+            .detach();
+    }
+}
+
 /// The backdrop layer for the window, or `None` when the active theme has none.
 pub fn layer(window: &mut Window, cx: &mut App) -> Option<AnyElement> {
     let theme = cx.global::<Themes>().active_theme().clone();
     let backdrop = theme.background.clone()?;
-    let moving = backdrop.speed > 0. && window.is_window_active() && !cx.reduce_motion();
+    let motion = motion(cx);
+    let moving = motion != Motion::Still
+        && backdrop.speed > 0.
+        && window.is_window_active()
+        && !cx.reduce_motion();
 
     // Kept while the layer renders, so the scene stops with the window or the theme.
     let slot = window.use_keyed_state("theme-backdrop", cx, |_, _| Slot::default());
@@ -161,6 +236,7 @@ pub fn layer(window: &mut Window, cx: &mut App) -> Option<AnyElement> {
             }
             let (_, _, scene) = slot.running.as_ref().unwrap();
             scene.set_moving(moving);
+            scene.set_floor(motion.floor());
             scene.frame()
         })
     });
@@ -205,20 +281,35 @@ pub fn layer(window: &mut Window, cx: &mut App) -> Option<AnyElement> {
                 move |bounds, window, cx| {
                     let size = (f32::from(bounds.size.width), f32::from(bounds.size.height));
                     let waiting = frame_size != Some(size);
+                    let mut interval = None;
                     if let Some((_, _, scene)) = &size_slot.read(cx).running {
                         scene.set_size(size.0, size.1);
+                        interval = Some(scene.interval());
                     }
-                    // Moving, or a frame for this size is still on its way.
-                    if moving || waiting {
-                        ui::request_slow_frame(window, cx);
+                    // Redraw at the scene's own pace while it moves, or soon
+                    // while a frame for this size is still on its way.
+                    if let Some(interval) = interval.filter(|_| moving || waiting) {
+                        let delay = if waiting {
+                            interval.min(Duration::from_millis(50))
+                        } else {
+                            interval
+                        };
+                        ui::request_frame_in(delay, window, cx);
                     }
                 },
                 move |bounds, _, window, cx| {
+                    // Each in one layer: thousands of overlapping shapes
+                    // share one draw order instead of each being placed in
+                    // GPUI's bounds tree, by far the costliest part otherwise.
+                    // Within a layer, shapes keep their order and glyphs draw
+                    // over shapes.
                     if let Some(frame) = &frame {
-                        paint_frame(&frame.commands, bounds.origin, window, cx);
+                        window.paint_layer(bounds, |window| {
+                            paint_frame(&frame.commands, bounds.origin, window, cx)
+                        });
                     }
                     if veil > 0. {
-                        paint_veil(bg, veil, bounds, window);
+                        window.paint_layer(bounds, |window| paint_veil(bg, veil, bounds, window));
                     }
                 },
             )

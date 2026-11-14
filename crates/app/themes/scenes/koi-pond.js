@@ -38,10 +38,15 @@ const carp = (cols, rows, t, i) => {
     x: ox, y: oy, w: Math.ceil(Math.max(...xs) - ox + 7), h: Math.ceil(Math.max(...ys) - oy + 7), key: i, shadow: '#0b3430',
     field: (gx, gy) => {
       const wx = ox + gx + .5, wy = oy + gy + .5;
-      let u = 0, d = Infinity;
-      spine.forEach(([px, py], j) => { const e = Math.hypot(wx - px, wy - py); if (e < d) { d = e; u = j; } });
-      d /= z;
-      const [nx, ny] = norm[u], dx = (wx - spine[u][0]) / z, dy = (wy - spine[u][1]) / z;
+      // (an indexed loop on squared distances: QuickJS has no JIT, and this
+      // runs for every cell of every carp)
+      let u = 0, d2 = Infinity;
+      for (let j = 0; j < spine.length; j++) {
+        const ex = wx - spine[j][0], ey = wy - spine[j][1], e = ex * ex + ey * ey;
+        if (e < d2) { d2 = e; u = j; }
+      }
+      const d = Math.sqrt(d2) / z;
+      const nx = norm[u][0], ny = norm[u][1], dx = (wx - spine[u][0]) / z, dy = (wy - spine[u][1]) / z;
       const v = dx * nx + dy * ny - swish(u), av = Math.abs(v), seed = { sx: u + i * 40, sy: Math.round(v * 1.5) };
       if (u < CARP_R.length && av <= CARP_R[u] && d <= CARP_R[u] + 1) {
         if (u >= 1 && u <= 2 && Math.abs(av - 1.8) < .55) return { c: P.e, ...seed };
@@ -67,16 +72,23 @@ const LILY_PAL = {
   shadow: { bg: '#0b3430', fg: '#0b3430', ch: '', a: .35 },
 };
 const lilyAt = (x, y, cols, rows, t) => {
-  const W = cols - SIDE;
-  for (const [fx, fy, r] of LOTUS) {
-    const cx = SIDE + fx * W, cy = fy * rows, dx = x + .5 - cx, dy = y + .5 - cy, d = Math.hypot(dx, dy), th = Math.atan2(dy, dx);
+  const W = cols - SIDE, px = x + .5, py = y + .5;
+  // (each shape is skipped by its box first: most cells are far from all of them)
+  for (let k = 0; k < LOTUS.length; k++) {
+    const fx = LOTUS[k][0], fy = LOTUS[k][1], r = LOTUS[k][2];
+    const cx = SIDE + fx * W, cy = fy * rows, dx = px - cx, dy = py - cy;
+    if (dx > r * 1.1 || dx < -r * 1.1 || dy > r * 1.1 || dy < -r * 1.1) continue;
+    const d = Math.hypot(dx, dy), th = Math.atan2(dy, dx);
     const p = r * (.55 + .45 * Math.abs(Math.cos(4 * th + fx * 9))) * (1 + .07 * Math.sin(t * .8 + fx * 5));
     if (d < .9) return LILY_PAL.heart;
     if (d < p * .55) return LILY_PAL.inner;
     if (d < p) return LILY_PAL.petal;
   }
-  for (const [fx, fy, r, notch] of LILIES) {
-    const cx = SIDE + fx * W, cy = fy * rows, dx = x + .5 - cx, dy = y + .5 - cy, d = Math.hypot(dx, dy);
+  for (let k = 0; k < LILIES.length; k++) {
+    const fx = LILIES[k][0], fy = LILIES[k][1], r = LILIES[k][2], notch = LILIES[k][3];
+    const cx = SIDE + fx * W, cy = fy * rows, dx = px - cx, dy = py - cy;
+    if (dx > r || dx < -r || dy > r || dy < -r) continue;
+    const d = Math.hypot(dx, dy);
     if (d > r) continue;
     const th = Math.atan2(dy, dx), off = Math.abs(((th - notch) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI);
     if (off < .3 && d > .4) continue;
@@ -86,14 +98,30 @@ const lilyAt = (x, y, cols, rows, t) => {
   }
 };
 
+// The ripples' centers and radii, worked out once per frame, not per cell.
+let ripples = { t: NaN, cols: 0, rows: 0, list: [] };
+const ripplesAt = (cols, rows, t) => {
+  if (ripples.t !== t || ripples.cols !== cols || ripples.rows !== rows) {
+    const list = [];
+    for (let i = 0; i < 5; i++)
+      list.push([SIDE + hash(i, 61) * (cols - SIDE), hash(i, 62) * rows, (t * 1.6 + i * 3.7) % 10]);
+    ripples = { t, cols, rows, list };
+  }
+  return ripples.list;
+};
+
 SCENES['koi-pond'] = {
   cell: (x, y, cols, rows, t) => {
     const lily = lilyAt(x, y, cols, rows, t);
     if (lily) return lily;
     if (lilyAt(x - 1, y - 1, cols, rows, t)) return LILY_PAL.shadow;
     if (hash(x - Math.floor(t * .3), y + Math.floor(t * .12), 77) < .004) return { bg: '#f4b6cc', fg: '#8a2d55', a: .85 };
-    for (let i = 0; i < 5; i++) {
-      const rr = (t * 1.6 + i * 3.7) % 10, d = Math.hypot(x - (SIDE + hash(i, 61) * (cols - SIDE)), y - hash(i, 62) * rows);
+    const rings = ripplesAt(cols, rows, t);
+    for (let i = 0; i < rings.length; i++) {
+      const rx = rings[i][0], ry = rings[i][1], rr = rings[i][2];
+      const dx = x - rx, dy = y - ry;
+      if (dx > rr + .5 || dx < -rr - .5 || dy > rr + .5 || dy < -rr - .5) continue;
+      const d = Math.hypot(dx, dy);
       if ((Math.abs(d - rr) < .5 || Math.abs(d - rr + 2.2) < .5) && hash(x, y, 63) < .7) return { ch: 'o', fg: '#d6f1e8', a: .4 * (1 - rr / 10) };
     }
     const deep = ell(x, y, SIDE + (cols - SIDE) * .5, rows * .45, (cols - SIDE) * .2, rows * .28);

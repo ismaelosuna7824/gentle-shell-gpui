@@ -220,6 +220,38 @@ impl SettingsView {
                             .child(format!("{percent:.0}%")),
                     ),
             )
+            .when(active.background.as_ref().is_some_and(|b| b.scene.is_some()), |d| {
+                let motion = backdrop::motion(cx);
+                let labels = backdrop::Motion::ALL.map(backdrop::Motion::label);
+                d.child(
+                    h_flex()
+                        .pb_2()
+                        .gap_3()
+                        .child(
+                            div()
+                                .w(px(120.))
+                                .text_sm()
+                                .text_color(ui::muted())
+                                .child("Scene motion"),
+                        )
+                        .child(ui::segmented(
+                            "backdrop-motion",
+                            &labels,
+                            backdrop::Motion::ALL.iter().position(|m| *m == motion),
+                            cx.listener(|_, index: &usize, _, cx| {
+                                backdrop::set_motion(backdrop::Motion::ALL[*index], cx);
+                                cx.notify();
+                            }),
+                        ))
+                        .child(
+                            div()
+                                .flex_1()
+                                .text_xs()
+                                .text_color(ui::faint())
+                                .child("Calm moves at half the rate; Still costs nothing. Scenes only move while this window is in front."),
+                        ),
+                )
+            })
             .when(active.oled, |d| {
                 d.child(
                     div()
