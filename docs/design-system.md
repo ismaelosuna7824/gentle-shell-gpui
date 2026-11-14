@@ -219,11 +219,11 @@ Guidelines:
 
 ## Brand
 
-`crates/app/src/shared/banner.rs` draws the Gentle Shell banner (the braille rose and the "Gentle Shell" pixel art logotype) as real pixels. The art, the palettes and the `banner.json` format come from gentle-pi's `extensions/startup-banner.ts`.
+`crates/app/src/shared/banner.rs` draws the Gentle Shell banner (the braille rose and the "Gentle Shell" pixel art logotype) as real pixels. The art comes from the brand assets `gentle_rose.txt` and `gentle_shell_combo.txt`: the rose keeps the per-cell shading of `gentle_rose_color.txt` as a lightness map (`ROSE_SHADE`, applied to whichever palette is active), and the layout follows the combo (a braille dot is half a logotype pixel, 5 columns between rose and logotype, both centered). The palettes and the `banner.json` format come from gentle-pi's `extensions/startup-banner.ts`; `Pink` uses the assets' ink (255, 118, 195) and shadow (120, 45, 80).
 
 | API | What it does |
 | --- | --- |
-| `banner(config, scale, reveal)` | Rose + logotype at `scale` px per pixel (~175 px wide per scale unit). `reveal` in 0..=1 writes the logotype left to right and fades in the rose; animate it by passing `t` from a `with_animation`. |
+| `banner(config, scale, reveal)` | Rose + logotype at `scale` px per pixel (~170 px wide per scale unit). Drive `reveal` from 0 to 1 linearly over `banner::WRITE` (2600 ms): the rose blooms from its heart outward (petals unfold as they appear) while a pen writes the logotype in cursive along its slant, at a steady ink rate (slower over dense letters, quick through joins, a short lift between the words); each fresh stroke glows like wet ink and cools to the ink color, and the shadow settles in just behind. The rose floats the whole time (a 5.2 s rise and fall, a 7.3 s sway about the bloom, a glint crossing the petals every 6.5 s), redrawn at 20 fps only while the window is active, and still with reduced motion. |
 | `BannerConfig { show_rose, show_text_logo, palette }` | Which parts to show and with which palette; `Default` shows everything in `Pink`. |
 | `Palette::{Pink, Cyan, Yellow, Green}` | Rose, ink and shadow of the logotype in fixed RGB (they do not depend on the theme). |
 | `read_config(config_home)` | Reads `<config>/banner.json` (`showRose`, `showTextLogo`, `color`); anything missing or invalid falls back to the default. |
@@ -232,7 +232,7 @@ Guidelines:
 
 The pixel art style shares rules: flat squares painted with `paint_quad`, slightly smaller than their cell so the grid shows (`dot * 0.55` in the rose, `dot * 0.9` in sprites); sprites defined as text (`#` body, `o` outline) like `LIPS` and `HEART` in `features/welcome/finale.rs`; colors derived from `petal()` when the effect belongs to the app.
 
-- **Welcome finale** (`features/welcome/finale.rs`, `FINALE = 5600 ms`): the banner rewrites itself in slow motion, the rose throws 14 pixelated kisses (one in four is a heart in `petal`), "Sexyyyy" enters letter by letter with `spring` and the screen dissolves from `DISSOLVE = 0.86` with smoothstep.
+- **Welcome finale** (`features/welcome/finale.rs`, `FINALE = 5600 ms`): the banner blooms and writes itself in again, the rose throws 14 pixelated kisses (one in four is a heart in `petal`), "Sexyyyy" enters letter by letter with `spring` and the screen dissolves from `DISSOLVE = 0.86` with smoothstep.
 - **Water reminder** (`features/hydration/drops.rs`, `DURATION = 6000 ms`): pixel drops (`DROP` sprite, `paint_sprite`) rain over the window, each splashing with a flat ripple where it lands, while a floating card fills a pixel glass drop by drop and says it's time for some water; everything fades from `FADE`. `hydration::show` plays it and `hydration::overlay(run)` paints it over the window root. Its water is `info()` and a lighter glint of the same hue. With reduced motion only the card shows.
 - **Effort surge** (`shared/surge.rs`, `DURATION = 4400 ms` at max): a pixel comet runs along the window edge, the window shakes, the core hatches and the rose comes out. Every thinking level plays its own share of that show, each adding a beat to the one below (`surge::Level::of`): minimal and low run the comet along a quarter and half of the edge; medium closes the lap and flares the edge; high gathers the core while the window trembles gently; xhigh trembles harder and hatches the core (flash, shockwave, sparks); max adds the rose. `off` plays nothing. `SessionEvent::Effort(level)` triggers it once the backend accepts the level and `Workspace::play_surge` plays it; `surge::overlay(run, level)` paints and `surge::shake_at(elapsed, level)` gives the offset. Its colors (`spark`, `wine`) are derived from the hue of `petal()`.
 
@@ -287,7 +287,7 @@ backdrop.occlude().child(ui::pop_in(
 `features/welcome/` takes up the whole window (below the 36 px title bar on Windows and Linux; on macOS it leaves a drag area below the traffic lights).
 
 - `screen_bg()` background with a gradient from the top: `petal().opacity(0.10)` while installing, `success().opacity(0.10)` when everything required is ready and `petal().opacity(0.18)` during the entrance.
-- Banner at scale 2.6, writing itself during `INTRO` (1500 ms); when ready it switches to `Palette::Green` with `pop_in`. Heading (34 px `BOLD`) and footer enter with `appear_after` at `AFTER_INTRO` (1100 ms). If the screen is shown again, `intro_done` draws everything in place without animating.
+- Banner at scale 2.6, blooming and writing itself over `banner::WRITE` (2600 ms, as long as `INTRO` + `AFTER_INTRO`); when ready it switches to `Palette::Green` with `pop_in`. Heading (34 px `BOLD`) and footer enter with `appear_after` at `AFTER_INTRO` (1100 ms). If the screen is shown again, `intro_done` draws everything in place without animating.
 - Content centered with `max_w(px(680.))`; 88 px footer with `px_10`; ↵ runs the primary button.
 
 ### Session status chips
