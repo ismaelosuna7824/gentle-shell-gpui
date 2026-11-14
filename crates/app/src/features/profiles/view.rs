@@ -90,7 +90,7 @@ impl Render for ProfilesView {
                                 .items_center()
                                 .py_8()
                                 .gap_2()
-                                .child(Icon::new(IconName::Layers).text_color(ui::faint()))
+                                .child(Icon::new(IconName::Route).text_color(ui::faint()))
                                 .child(
                                     div()
                                         .text_sm()
@@ -112,7 +112,7 @@ impl Render for ProfilesView {
                 .child(
                     ui::screen_header()
                         .child(
-                            Icon::new(IconName::Layers)
+                            Icon::new(IconName::Route)
                                 .small()
                                 .flex_shrink_0()
                                 .text_color(ui::muted()),

@@ -80,6 +80,8 @@ gpui_kit::assets::icon_assets!(
         GitCommitHorizontal,
         // Commit History.
         GitGraph,
+        // Profiles: routing models to agents.
+        Route,
         // Effort levels (off, minimal, low, high; Brain, Zap and Flame above).
         Moon,
         Feather,
