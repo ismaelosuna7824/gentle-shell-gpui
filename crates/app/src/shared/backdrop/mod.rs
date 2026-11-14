@@ -327,10 +327,14 @@ fn paint_veil(bg: u32, veil: f32, bounds: Bounds<Pixels>, window: &mut Window) {
     let clear = color(bg as f64, 0.);
     let calm = color(bg as f64, f64::from(veil) * 0.85);
     // 0–18% clear, 18–32% fading in, 32–68% calm, 68–82% fading out.
+    // The bands are translucent, so they meet edge to edge on whole pixels:
+    // any overlap would draw twice and show as a darker line.
+    let edge = |at: f32| (bounds.origin.x + w * at).round();
     let band = |from: f32, to: f32| {
+        let (left, right) = (edge(from), edge(to));
         Bounds::new(
-            point(bounds.origin.x + w * from, bounds.origin.y),
-            size(w * (to - from) + px(1.), bounds.size.height),
+            point(left, bounds.origin.y),
+            size(right - left, bounds.size.height),
         )
     };
     let ramp =
