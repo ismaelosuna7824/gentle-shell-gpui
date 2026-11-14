@@ -16,6 +16,7 @@ pub(super) fn theme_section(transparency: &Entity<SliderState>, cx: &App) -> Div
     let state = cx.global::<themes::Themes>();
     let groups = [
         (themes::Source::Gentle, "Gentle Shell"),
+        (themes::Source::App, "With backgrounds"),
         (themes::Source::Pi, "Your Pi themes"),
         (themes::Source::Builtin, "Popular"),
     ];
@@ -71,6 +72,15 @@ pub(super) fn theme_section(transparency: &Entity<SliderState>, cx: &App) -> Div
         }
         card = card
             .child(div().pt_2().pb_1p5().child(ui::section_label(label)))
+            .when(source == themes::Source::App, |d| {
+                d.child(
+                    div()
+                        .pb_2()
+                        .text_xs()
+                        .text_color(ui::muted())
+                        .child("Ask an agent for one (\"a theme with falling petals in my colors\"): it writes it to the app's themes folder and it shows up here."),
+                )
+            })
             .child(div().grid().grid_cols(4).gap_2().children(cards));
     }
     card
@@ -135,6 +145,9 @@ fn theme_card(index: usize, theme: &themes::Theme, selected: bool) -> Stateful<D
                         .text_color(if selected { ui::fg() } else { ui::muted() })
                         .child(theme.name.clone()),
                 )
+                .when_some(theme.background.as_ref(), |d, wallpaper| {
+                    d.child(ui::chip(wallpaper.kind.label(), solid(theme.accent)))
+                })
                 .when(selected, |d| {
                     d.child(Icon::new(IconName::Check).xsmall().text_color(ui::accent()))
                 }),

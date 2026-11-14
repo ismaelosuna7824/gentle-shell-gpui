@@ -9,3 +9,4 @@ pub mod pane;
 pub mod surge;
 pub mod themes;
 pub mod ui;
+pub mod wallpaper;

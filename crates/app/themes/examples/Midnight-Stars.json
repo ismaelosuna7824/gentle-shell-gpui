@@ -1,0 +1,38 @@
+{
+  "name": "Midnight Stars",
+  "vars": {
+    "bg": "#05070f",
+    "text": "#e8ecf6",
+    "muted": "#8590ab",
+    "dim": "#56607a",
+    "accent": "#e0c15a",
+    "blue": "#7fb4ca",
+    "green": "#b7cc85",
+    "red": "#cb7c94",
+    "warning": "#deba87",
+    "star": "#f3f6ff",
+    "border": "#222a40"
+  },
+  "colors": {
+    "text": "text",
+    "muted": "muted",
+    "dim": "dim",
+    "accent": "accent",
+    "borderAccent": "#f0d785",
+    "border": "border",
+    "success": "green",
+    "error": "red",
+    "warning": "warning",
+    "toolTitle": "blue",
+    "userMessageBg": "#121a2c",
+    "selectedBg": "#1a2338",
+    "syntaxFunction": "blue"
+  },
+  "export": { "pageBg": "bg" },
+  "background": {
+    "preset": "stars",
+    "colors": ["star", "accent", "blue"],
+    "speed": 1,
+    "intensity": 0.7
+  }
+}

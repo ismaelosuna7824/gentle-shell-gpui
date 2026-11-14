@@ -75,6 +75,8 @@ impl Render for Workspace {
             .relative()
             .left(px(shake_x))
             .top(px(shake_y))
+            // The theme's background, first so everything draws over it.
+            .children(crate::shared::wallpaper::layer(window, cx))
             .child(
                 TitleBar::new()
                     .h(px(TITLE_BAR_HEIGHT))

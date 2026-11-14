@@ -1,9 +1,10 @@
 //! What the app tells every agent it starts (appended to the system prompt
 //! with `--append-system-prompt`): pages open in the app's browser with
-//! `gentle-open`, and, with "Agents can use devices" on, simulators and
+//! `gentle-open`; with "Agents can use devices" on, simulators and
 //! emulators open in the device panel with `gentle-device` and are driven
-//! with `agent-device`. The point is that the user watches everything inside
-//! the app; nothing opens a separate browser, Simulator or emulator window.
+//! with `agent-device`; and app themes go in the app's themes folder. The
+//! point is that the user watches everything inside the app; nothing opens
+//! a separate browser, Simulator or emulator window.
 
 use std::path::PathBuf;
 
@@ -31,6 +32,24 @@ usual tools, then install and launch through `agent-device`.
 - `gentle-device close \"<name>\" --shutdown` turns a device off when you're done with it.
 ";
 
+/// How an agent makes an app theme; `dir` is the app's themes folder.
+fn themes(dir: &std::path::Path) -> String {
+    format!(
+        "\
+- App themes (colors, and an optional animated background): when the user asks you to theme or \
+restyle the app itself, write one JSON file to `{dir}/<Name>.json`. The app picks it up within \
+seconds; tell the user to choose it in Configuration › Theme (\"With backgrounds\"). Format: \
+`{{\"name\": \"…\", \"vars\": {{\"bg\": \"#hex\", …}}, \"colors\": {{\"text\", \"muted\", \"dim\", \"accent\", \
+\"borderAccent\", \"border\", \"success\", \"error\", \"warning\", \"toolTitle\", \"userMessageBg\", \"selectedBg\": \
+\"#hex\" or a var name}}, \"export\": {{\"pageBg\": \"bg\"}}, \"background\": {{\"preset\": \"aurora\" | \"petals\" | \
+\"stars\" | \"rain\" | \"gradient\", \"colors\": [1-4 \"#hex\" or var names], \"speed\": 0-3 (0 = still, 1 = \
+default), \"intensity\": 0.05-1}}}}`. Keep text readable against `bg`. Don't put these files in Pi's \
+own themes folder: Pi rejects the `background` key.
+",
+        dir = dir.display()
+    )
+}
+
 /// The instructions for `prefs`, written to the app's data folder; the
 /// file to append, or `None` when it can't be written.
 pub fn agent_instructions(prefs: Prefs) -> Option<PathBuf> {
@@ -40,6 +59,9 @@ pub fn agent_instructions(prefs: Prefs) -> Option<PathBuf> {
     let mut text = PAGES.to_string();
     if prefs.enabled && prefs.agents {
         text.push_str(DEVICES);
+    }
+    if let Some(dir) = crate::shared::themes::app_themes_dir() {
+        text.push_str(&themes(&dir));
     }
     if std::fs::read_to_string(&path).ok().as_deref() != Some(text.as_str()) {
         std::fs::create_dir_all(path.parent()?).ok()?;

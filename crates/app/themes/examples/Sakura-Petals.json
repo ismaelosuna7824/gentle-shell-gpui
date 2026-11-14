@@ -1,0 +1,38 @@
+{
+  "name": "Sakura Petals",
+  "vars": {
+    "bg": "#120a10",
+    "text": "#f7edf2",
+    "muted": "#b08fa0",
+    "dim": "#7c6170",
+    "accent": "#f4a6c6",
+    "petal": "#ffc9dd",
+    "blue": "#a9c7ee",
+    "green": "#b4e7c7",
+    "red": "#ff7d96",
+    "warning": "#f2c27d",
+    "border": "#3d2533"
+  },
+  "colors": {
+    "text": "text",
+    "muted": "muted",
+    "dim": "dim",
+    "accent": "accent",
+    "borderAccent": "petal",
+    "border": "border",
+    "success": "green",
+    "error": "red",
+    "warning": "warning",
+    "toolTitle": "warning",
+    "userMessageBg": "#2a1522",
+    "selectedBg": "#33182a",
+    "syntaxFunction": "blue"
+  },
+  "export": { "pageBg": "bg" },
+  "background": {
+    "preset": "petals",
+    "colors": ["petal", "accent", "#ffffff"],
+    "speed": 1,
+    "intensity": 0.6
+  }
+}
