@@ -31,7 +31,7 @@ pub(super) fn screen_rows() -> Vec<Row> {
             PaletteAction::Agents,
         ),
         row(
-            IconName::Layers,
+            IconName::Route,
             "Profiles",
             "Model and effort per agent; profiles as tabs",
             PaletteAction::Profiles,

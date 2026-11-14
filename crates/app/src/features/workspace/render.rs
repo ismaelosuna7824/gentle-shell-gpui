@@ -286,7 +286,7 @@ impl Render for Workspace {
                                                                     },
                                                                 ))
                                                                 .item(entry(
-                                                                    IconName::Layers,
+                                                                    IconName::Route,
                                                                     "Profiles",
                                                                     "Model and effort per agent",
                                                                     |this, window, cx| {
@@ -368,7 +368,7 @@ impl Render for Workspace {
                                         ))
                                         .child(button(
                                             "open-profiles",
-                                            IconName::Layers,
+                                            IconName::Route,
                                             "Profiles: model and effort per agent",
                                             open(|o| matches!(o, Overlay::Profiles(_))),
                                             |this, window, cx| this.open_profiles(window, cx),
