@@ -118,13 +118,18 @@ impl ProfilesView {
         }
     }
 
-    /// ↑/↓/Enter/Esc while a picker is open.
+    /// ↑/↓/Enter/Esc while the model picker is open; Esc for the effort menu.
     pub(in crate::features::profiles) fn model_menu_key(
         &mut self,
         keystroke: &Keystroke,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> bool {
+        if self.effort_menu.is_some() && keystroke.key == "escape" {
+            self.effort_menu = None;
+            cx.notify();
+            return true;
+        }
         let Some(key) = self.model_menu.clone() else {
             return false;
         };

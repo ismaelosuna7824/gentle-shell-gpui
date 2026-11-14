@@ -1,9 +1,11 @@
 //! Store actions: writing `profiles.json`, Save, Use in this session, Make
-//! default, the repository pin, Publish, and the name and leave flows.
+//! default, the repository pin, Publish, Export and Import, and the name and
+//! leave flows.
 
 use gentle_core::profiles::{
-    PinRead, ProfilesFile, Routing, create_profile, delete_profile, duplicate_profile,
-    normalize_routing, parse_model_ref, rename_profile, serialize_profiles, update_profile,
+    PROFILE_EXPORT_FILE, PinRead, ProfileExport, ProfilesFile, Routing, create_profile,
+    delete_profile, duplicate_profile, normalize_routing, parse_model_ref, parse_profile_export,
+    rename_profile, serialize_profile_export, serialize_profiles, update_profile,
 };
 use gpui_kit::*;
 
@@ -413,6 +415,137 @@ impl ProfilesView {
                         |_, _, _| {},
                     );
                 }
+            }),
+        }
+        cx.notify();
+    }
+
+    /// Save pending edits, then write the selected profile as an export
+    /// (Gentle Shell's `profiles.export.json` format) where the user picks.
+    pub(super) fn export_profile(&mut self, cx: &mut Context<Self>) {
+        self.save_then(cx, |this, _, cx| this.export_saved(cx));
+    }
+
+    fn export_saved(&mut self, cx: &mut Context<Self>) {
+        let (Some(name), Some(env)) = (self.selected.clone(), self.env.clone()) else {
+            return;
+        };
+        let Some(config) = self.file.get(&name) else {
+            return;
+        };
+        let text = match serialize_profile_export(&name, config) {
+            Ok(text) => text,
+            Err(error) => {
+                self.say(format!("Profile not exported: {error}"), Tone::Bad);
+                cx.notify();
+                return;
+            }
+        };
+        // Gentle Shell's own export path by default, so `/gentle:profiles
+        // import` in a terminal finds it.
+        let picked = cx.prompt_for_new_path(&env.config_home, Some(PROFILE_EXPORT_FILE));
+        cx.spawn(async move |this, cx| {
+            let Ok(Ok(Some(path))) = picked.await else {
+                return;
+            };
+            let _ = this.update(cx, |this, cx| {
+                this.run_io(
+                    cx,
+                    move || {
+                        write_atomic(&path, &text)
+                            .map(|()| path)
+                            .map_err(|e| e.to_string())
+                    },
+                    move |this, result, _| match result {
+                        Ok(path) => this.say(
+                            format!("Exported \"{name}\" to {}.", path.display()),
+                            Tone::Good,
+                        ),
+                        Err(error) => this.say(format!("Profile not exported: {error}"), Tone::Bad),
+                    },
+                );
+            });
+        })
+        .detach();
+    }
+
+    /// Save pending edits, then read a profile export the user picks and
+    /// add it (or, after asking, replace the profile of the same name).
+    pub(super) fn import_profile(&mut self, cx: &mut Context<Self>) {
+        self.save_then(cx, |_, _, cx| {
+            let picked = cx.prompt_for_paths(PathPromptOptions {
+                files: true,
+                directories: false,
+                multiple: false,
+                prompt: Some("Import".into()),
+            });
+            cx.spawn(async move |this, cx| {
+                let Ok(Ok(Some(paths))) = picked.await else {
+                    return;
+                };
+                let Some(path) = paths.into_iter().next() else {
+                    return;
+                };
+                let _ = this.update(cx, |this, cx| {
+                    this.run_io(
+                        cx,
+                        move || {
+                            let text = std::fs::read_to_string(&path);
+                            (path, text.map_err(|e| e.to_string()))
+                        },
+                        |this, (path, text), cx| match text.map(|t| parse_profile_export(&t)) {
+                            Err(error) => this.say(
+                                format!("Could not read {}: {error}", path.display()),
+                                Tone::Bad,
+                            ),
+                            Ok(None) => this.say(
+                                format!(
+                                    "{} is not a profile export (gentle-pi.agent_model_profile).",
+                                    path.display()
+                                ),
+                                Tone::Bad,
+                            ),
+                            Ok(Some(export)) if this.file.has(&export.name) => {
+                                this.confirm = Some(Confirm::ReplaceImport(export));
+                            }
+                            Ok(Some(export)) => this.add_import(export, cx),
+                        },
+                    );
+                });
+            })
+            .detach();
+        });
+    }
+
+    /// Write an imported profile into the store and show it.
+    pub(super) fn add_import(&mut self, export: ProfileExport, cx: &mut Context<Self>) {
+        self.confirm = None;
+        let ProfileExport {
+            name,
+            config,
+            dropped,
+        } = export;
+        let routes = config.iter().count();
+        let next = if self.file.has(&name) {
+            update_profile(&self.file, &name, config)
+        } else {
+            create_profile(&self.file, &name, config)
+        };
+        match next {
+            Err(error) => self.say(format!("Profile not imported: {error}"), Tone::Bad),
+            Ok(next) => self.write_store(next, cx, move |this, _| {
+                this.select(Some(name.clone()), false);
+                let mut message = format!(
+                    "Imported \"{name}\" ({routes} {}).",
+                    if routes == 1 { "route" } else { "routes" }
+                );
+                if !dropped.is_empty() {
+                    message.push_str(&format!(
+                        " Left out invalid entries: {}.",
+                        dropped.join(", ")
+                    ));
+                }
+                this.say(message, Tone::Good);
             }),
         }
         cx.notify();

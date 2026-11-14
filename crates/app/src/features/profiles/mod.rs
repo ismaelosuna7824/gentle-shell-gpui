@@ -92,6 +92,8 @@ enum Confirm {
     Unsaved(Leave),
     Delete(String),
     MakeDefault(DefaultPlan),
+    /// An import names a profile that exists: replace its routing?
+    ReplaceImport(gentle_core::profiles::ProfileExport),
 }
 
 /// Rows: the orchestrator, "every agent", then each assignment name.
@@ -125,6 +127,8 @@ pub struct ProfilesView {
     model_search: Entity<InputState>,
     model_cursor: usize,
     model_scroll: ScrollHandle,
+    /// The route row whose effort menu is open.
+    effort_menu: Option<String>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -206,6 +210,7 @@ impl ProfilesView {
             model_search,
             model_cursor: 0,
             model_scroll: ScrollHandle::new(),
+            effort_menu: None,
             _subscriptions: subscriptions,
         };
         this.reload(cx);
