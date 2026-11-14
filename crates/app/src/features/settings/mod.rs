@@ -89,6 +89,8 @@ pub struct SettingsView {
     music: music::Music,
     /// Devices: the switches, what this machine has, an install running.
     devices: devices::Devices,
+    /// Theme: importing and sharing themes.
+    theme_share: theme::ThemeShare,
 }
 
 impl EventEmitter<SettingsEvent> for SettingsView {}
@@ -155,6 +157,7 @@ impl SettingsView {
             maestro: maestro::Maestro::default(),
             music: music::Music::default(),
             devices: devices::Devices::default(),
+            theme_share: theme::ThemeShare::new(window, cx),
         };
         this.reload(cx);
         this.refresh_maestro(cx);
@@ -273,7 +276,18 @@ impl Render for SettingsView {
                     .child(self.maestro_section(cx))
                     .child(self.music_section(cx))
                     .child(self.hydration_section(cx))
-                    .child(theme::theme_section(&self.transparency, cx))
+                    .child(
+                        div()
+                            .id("theme-drop")
+                            .rounded_xl()
+                            .drag_over::<ExternalPaths>(|style, _, _, _| {
+                                style.bg(ui::surface_hover())
+                            })
+                            .on_drop(cx.listener(|this, paths: &ExternalPaths, _, cx| {
+                                this.theme_drop(paths, cx)
+                            }))
+                            .child(self.theme_section(cx)),
+                    )
                     .child(models::models_section(s))
                     .child(self.gentle_ai_section(s, cx))
                     .child(self.notifications_section(cx))

@@ -12,6 +12,7 @@ use std::sync::{LazyLock, RwLock};
 use gpui_kit::{App, Global};
 use serde_json::Value;
 
+use crate::shared::backdrop::{self, Backdrop};
 use crate::shared::ui;
 
 /// The theme used when nothing else is chosen (and the fallback for unknown names).
@@ -32,91 +33,11 @@ pub enum Source {
     /// `<agent dir>/themes/`.
     Pi,
     /// The app's own themes: `<data dir>/gentle-shell-gpui/themes/` and the
-    /// examples it ships. They may carry a [`Wallpaper`], which Pi's strict
-    /// theme schema would reject, so they don't live in Pi's folder.
+    /// examples it ships. They may carry a backdrop (`background`), which
+    /// Pi's strict theme schema would reject, so they don't live in Pi's folder.
     App,
     /// Popular terminal schemes shipped with the app.
     Builtin,
-}
-
-/// What an animated (or still) background draws behind the panes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WallpaperKind {
-    /// Soft drifting blobs of color.
-    Aurora,
-    /// Petals falling and swaying.
-    Petals,
-    /// Twinkling stars drifting slowly.
-    Stars,
-    /// Thin streaks falling.
-    Rain,
-    /// A gradient whose angle turns.
-    Gradient,
-}
-
-impl WallpaperKind {
-    pub const NAMES: [&str; 5] = ["aurora", "petals", "stars", "rain", "gradient"];
-
-    fn parse(name: &str) -> Option<Self> {
-        Some(match name.trim().to_ascii_lowercase().as_str() {
-            "aurora" => Self::Aurora,
-            "petals" => Self::Petals,
-            "stars" => Self::Stars,
-            "rain" => Self::Rain,
-            "gradient" => Self::Gradient,
-            _ => return None,
-        })
-    }
-
-    pub fn label(self) -> &'static str {
-        Self::NAMES[self as usize]
-    }
-}
-
-/// A theme's `background`: a preset with its colors, speed and strength.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Wallpaper {
-    pub kind: WallpaperKind,
-    /// One to four `0xRRGGBB` colors.
-    pub colors: Vec<u32>,
-    /// 0 holds it still; 1 is the preset's own pace; at most 3.
-    pub speed: f32,
-    /// How much it shows, 0.05 to 1.
-    pub intensity: f32,
-}
-
-/// `background`: `{"preset": "aurora", "colors": ["#hex" | var, …],
-/// "speed": 1, "intensity": 0.5}`. Colors resolve like the theme's (`resolve`)
-/// and default to `fallback`; an unknown preset means no background.
-fn parse_wallpaper(
-    value: &Value,
-    resolve: impl Fn(&Value) -> Option<u32>,
-    fallback: [u32; 3],
-) -> Option<Wallpaper> {
-    let kind = WallpaperKind::parse(value.get("preset")?.as_str()?)?;
-    let mut colors: Vec<u32> = value
-        .get("colors")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter_map(&resolve)
-        .take(4)
-        .collect();
-    if colors.is_empty() {
-        colors = fallback.to_vec();
-    }
-    let number = |key: &str, default: f32| {
-        value
-            .get(key)
-            .and_then(Value::as_f64)
-            .map_or(default, |n| n as f32)
-    };
-    Some(Wallpaper {
-        kind,
-        colors,
-        speed: number("speed", 1.).clamp(0., 3.),
-        intensity: number("intensity", 0.5).clamp(0.05, 1.),
-    })
 }
 
 /// One theme, as opaque `0xRRGGBB` colors. UI roles are resolved from it by
@@ -150,7 +71,9 @@ pub struct Theme {
     /// Normal 0–7, bright 8–15.
     pub ansi: [u32; 16],
     /// Drawn behind the panes (app themes only).
-    pub background: Option<Wallpaper>,
+    pub background: Option<Backdrop>,
+    /// The file the theme was read from, when it has one.
+    pub file: Option<PathBuf>,
 }
 
 // ── Color math ─────────────────────────────────────────────────────────────
@@ -212,7 +135,11 @@ fn parse_hex(text: &str) -> Option<u32> {
 /// indices, and `colors` whose values are a hex color, an index, a var name, or
 /// `""` (terminal default). Terminal colors are not part of the format, so the
 /// ANSI table comes from ANSI-named vars when present, else from the roles.
-pub fn parse_pi_theme(text: &str, source: Source) -> Option<Theme> {
+///
+/// App themes may also be in claude-desktop-themes' shape (`bg`, `text` and
+/// `accent` at the top) and carry a backdrop; `file` is where the theme was
+/// read from, whose folder holds the backdrop's files.
+pub fn parse_pi_theme(text: &str, source: Source, file: Option<&Path>) -> Option<Theme> {
     let value: Value = serde_json::from_str(text).ok()?;
     let name = value.get("name")?.as_str()?.trim();
     if name.is_empty() {
@@ -234,12 +161,18 @@ pub fn parse_pi_theme(text: &str, source: Source) -> Option<Theme> {
     }
     let color = |key: &str| colors.get(key).and_then(|v| resolve(v, &vars, 0));
     let var = |key: &str| vars.get(key).and_then(|v| resolve(v, &vars, 0));
+    let top = |key: &str| {
+        (source == Source::App)
+            .then(|| value.get(key).and_then(|v| resolve(v, &vars, 0)))
+            .flatten()
+    };
 
-    let fg_guess = color("text");
+    let fg_guess = color("text").or_else(|| top("text"));
     let bg = export
         .get("pageBg")
         .and_then(|v| resolve(v, &vars, 0))
-        .or_else(|| var("bg"));
+        .or_else(|| var("bg"))
+        .or_else(|| top("bg"));
     let light = match (bg, fg_guess) {
         (Some(bg), _) => luminance(bg) > 0.5,
         (None, Some(fg)) => luminance(fg) < 0.5,
@@ -249,7 +182,7 @@ pub fn parse_pi_theme(text: &str, source: Source) -> Option<Theme> {
     let fg = fg_guess.unwrap_or(if light { 0x1f2328 } else { 0xe6e6e6 });
     let muted = color("muted").unwrap_or_else(|| mix(fg, bg, 0.35));
     let faint = color("dim").unwrap_or_else(|| mix(fg, bg, 0.55));
-    let accent = color("accent").unwrap_or(fg);
+    let accent = color("accent").or_else(|| top("accent")).unwrap_or(fg);
     let accent_active = color("borderAccent")
         .filter(|c| *c != accent)
         .unwrap_or_else(|| mix(accent, fg, 0.3));
@@ -293,9 +226,12 @@ pub fn parse_pi_theme(text: &str, source: Source) -> Option<Theme> {
 
     // Only the app's themes may have one: Pi's schema rejects the key.
     let background = (source == Source::App)
-        .then(|| value.get("background"))
-        .flatten()
-        .and_then(|b| parse_wallpaper(b, |v| resolve(v, &vars, 0), [accent, info, success]));
+        .then(|| {
+            backdrop::model::parse(&value, file.and_then(Path::parent), |v| {
+                resolve(v, &vars, 0)
+            })
+        })
+        .flatten();
 
     Some(Theme {
         name: name.to_string(),
@@ -321,6 +257,7 @@ pub fn parse_pi_theme(text: &str, source: Source) -> Option<Theme> {
         selection: color("selectedBg").unwrap_or_else(|| mix(bg, accent, 0.25)),
         ansi,
         background,
+        file: file.map(Path::to_path_buf),
     })
 }
 
@@ -389,7 +326,8 @@ fn gentle_ansi(name: &str) -> Option<[u32; 16]> {
     })
 }
 
-/// Every `*.json` Pi theme in `dir`, sorted by name; unreadable files are skipped.
+/// Every theme file in `dir` (`*.json`, and for the app's own folder shared
+/// `*.gentletheme` files too), sorted by name; unreadable files are skipped.
 pub fn read_theme_dir(dir: &Path, source: Source) -> Vec<Theme> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
@@ -397,8 +335,12 @@ pub fn read_theme_dir(dir: &Path, source: Source) -> Vec<Theme> {
     let mut themes: Vec<Theme> = entries
         .flatten()
         .map(|e| e.path())
-        .filter(|p| p.extension().is_some_and(|x| x == "json"))
-        .filter_map(|p| parse_pi_theme(&std::fs::read_to_string(p).ok()?, source))
+        .filter(|p| {
+            p.extension().is_some_and(|x| {
+                x == "json" || (source == Source::App && x == backdrop::SHARE_EXTENSION)
+            })
+        })
+        .filter_map(|p| parse_pi_theme(&std::fs::read_to_string(&p).ok()?, source, Some(&p)))
         .collect();
     themes.sort_by_key(|t| t.name.to_lowercase());
     themes
@@ -502,6 +444,7 @@ fn from_scheme(s: &Scheme) -> Theme {
         selection: s.selection,
         ansi: a,
         background: None,
+        file: None,
     }
 }
 
@@ -538,6 +481,7 @@ fn oled_black() -> Theme {
         selection: 0x28121e,
         ansi,
         background: None,
+        file: None,
     }
 }
 
@@ -553,23 +497,34 @@ pub fn builtin_themes() -> Vec<Theme> {
 fn embedded_gentle() -> Vec<Theme> {
     EMBEDDED
         .iter()
-        .map(|text| parse_pi_theme(text, Source::Gentle).expect("embedded Gentle theme parses"))
+        .map(|text| {
+            parse_pi_theme(text, Source::Gentle, None).expect("embedded Gentle theme parses")
+        })
         .collect()
 }
 
-/// Themes with backgrounds the app ships as examples (its `theme-examples`):
+/// Themes with backdrops the app ships as examples (its `theme-examples`):
 /// the user's or the agent's own app themes of the same name replace them.
 const EXAMPLES: &[&str] = &[
-    include_str!("../../themes/examples/Gentle-Aurora.json"),
-    include_str!("../../themes/examples/Sakura-Petals.json"),
-    include_str!("../../themes/examples/Midnight-Stars.json"),
-    include_str!("../../themes/examples/Neon-Rain.json"),
+    include_str!("../../themes/examples/aurora.json"),
+    include_str!("../../themes/examples/petals.json"),
+    include_str!("../../themes/examples/moonlit.json"),
+    include_str!("../../themes/examples/koi-pond.json"),
+    include_str!("../../themes/examples/sakura-dusk.json"),
+    include_str!("../../themes/examples/neon-rain.json"),
+    include_str!("../../themes/examples/jellyfish.json"),
+    include_str!("../../themes/examples/lantern-night.json"),
+    include_str!("../../themes/examples/fireflies.json"),
+    include_str!("../../themes/examples/snow-cabin.json"),
+    include_str!("../../themes/examples/star-voyage.json"),
+    include_str!("../../themes/examples/honu-lagoon.json"),
+    include_str!("../../themes/examples/cloud-drift.json"),
 ];
 
 pub fn example_themes() -> Vec<Theme> {
     EXAMPLES
         .iter()
-        .map(|text| parse_pi_theme(text, Source::App).expect("example theme parses"))
+        .map(|text| parse_pi_theme(text, Source::App, None).expect("example theme parses"))
         .collect()
 }
 
@@ -610,15 +565,15 @@ fn read_user_themes(agent: &Path) -> Vec<Theme> {
     themes
 }
 
-/// A cheap fingerprint of a themes folder: each `*.json` with its size and
-/// modification time, so a poll notices files added, edited or removed.
+/// A cheap fingerprint of a themes folder: each file with its size and
+/// modification time, so a poll notices themes (and their scenes and
+/// images) added, edited or removed.
 fn dir_stamp(dir: &Path) -> Vec<(PathBuf, u64, Option<std::time::SystemTime>)> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
     };
     let mut stamp: Vec<_> = entries
         .flatten()
-        .filter(|e| e.path().extension().is_some_and(|x| x == "json"))
         .filter_map(|e| {
             let meta = e.metadata().ok()?;
             Some((e.path(), meta.len(), meta.modified().ok()))
@@ -899,6 +854,56 @@ fn replace_user_themes(user: Vec<Theme>, cx: &mut App) {
     cx.refresh_windows();
 }
 
+/// Add a shared theme (a `.gentletheme` file's text) to the app's themes
+/// folder and switch to it. Its name, or why it couldn't be added.
+pub fn install_shared(text: &str, cx: &mut App) -> Result<String, String> {
+    let theme = parse_pi_theme(text, Source::App, None)
+        .ok_or("That isn't a theme file: it needs at least a \"name\".")?;
+    let dir = app_themes_dir().ok_or("There's no data folder to keep themes in.")?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!(
+        "{}.{}",
+        backdrop::model::file_stem(&theme.name),
+        backdrop::SHARE_EXTENSION
+    ));
+    std::fs::write(&path, text).map_err(|e| e.to_string())?;
+    replace_user_themes(read_user_themes(&pi_rpc::resolve_homes().agent), cx);
+    let index = cx
+        .global::<Themes>()
+        .catalog
+        .iter()
+        .position(|t| t.file.as_deref() == Some(path.as_path()));
+    if let Some(index) = index {
+        select(index, cx);
+    }
+    Ok(theme.name)
+}
+
+/// `theme` as one file to share (`<stem>.gentletheme`): its file with the
+/// scene and image put inside. App themes only; `None` for the others.
+pub fn share_text(theme: &Theme) -> Option<Result<(String, String), String>> {
+    if theme.source != Source::App {
+        return None;
+    }
+    let stem = backdrop::model::file_stem(&theme.name);
+    let text = match &theme.file {
+        Some(file) => {
+            let text = std::fs::read_to_string(file).map_err(|e| e.to_string());
+            let dir = file.parent().unwrap_or(Path::new("."));
+            text.and_then(|text| backdrop::model::bundle(&text, dir))
+        }
+        // An example: its scene is built in, so the file is already whole.
+        None => EXAMPLES
+            .iter()
+            .find(|text| {
+                parse_pi_theme(text, Source::App, None).is_some_and(|t| t.name == theme.name)
+            })
+            .map(|text| text.to_string())
+            .ok_or_else(|| "This theme has no file.".to_string()),
+    };
+    Some(text.map(|text| (stem, text)))
+}
+
 /// Swap the installed Gentle themes in, re-applying when the active one changed.
 fn merge_gentle(gentle: Vec<Theme>, persisted: Option<String>, pi: Option<String>, cx: &mut App) {
     let themes = cx.global::<Themes>();
@@ -997,7 +1002,7 @@ mod tests {
 
     #[test]
     fn parses_gentle_theme_json() {
-        let cute = parse_pi_theme(EMBEDDED[0], Source::Gentle).unwrap();
+        let cute = parse_pi_theme(EMBEDDED[0], Source::Gentle, None).unwrap();
         assert_eq!(cute.name, "Gentleman-Cute");
         assert!(!cute.light);
         assert_eq!(cute.bg, 0x060407);
@@ -1016,7 +1021,7 @@ mod tests {
         assert_eq!(cute.ansi[1], 0xff718f);
 
         // Gentle: accent is a var reference; ANSI vars feed the info color.
-        let gentle = parse_pi_theme(EMBEDDED[2], Source::Gentle).unwrap();
+        let gentle = parse_pi_theme(EMBEDDED[2], Source::Gentle, None).unwrap();
         assert_eq!(gentle.name, "Gentle");
         assert_eq!(gentle.accent, 0x7fb4ca);
         assert_eq!(gentle.info, 0x7fb4ca);
@@ -1031,7 +1036,7 @@ mod tests {
             "colors": { "text": 16, "accent": "#0af", "muted": "", "error": "red" },
             "export": { "pageBg": "ink" }
         }"##;
-        let theme = parse_pi_theme(text, Source::Pi).unwrap();
+        let theme = parse_pi_theme(text, Source::Pi, None).unwrap();
         assert!(theme.light);
         assert_eq!(theme.bg, 0xffffff);
         assert_eq!(theme.fg, 0x000000);
@@ -1039,8 +1044,8 @@ mod tests {
         assert_eq!(theme.danger, 0xaa0000);
         assert_eq!(theme.ansi[1], 0xaa0000);
         assert_eq!(theme.ansi[9], 0xff0000);
-        assert!(parse_pi_theme("{\"vars\":{}}", Source::Pi).is_none());
-        assert!(parse_pi_theme("not json", Source::Pi).is_none());
+        assert!(parse_pi_theme("{\"vars\":{}}", Source::Pi, None).is_none());
+        assert!(parse_pi_theme("not json", Source::Pi, None).is_none());
     }
 
     #[test]
@@ -1071,7 +1076,7 @@ mod tests {
 
     #[test]
     fn catalog_merges_without_duplicates() {
-        let mut installed = parse_pi_theme(EMBEDDED[0], Source::Gentle).unwrap();
+        let mut installed = parse_pi_theme(EMBEDDED[0], Source::Gentle, None).unwrap();
         installed.accent = 0x123456;
         let mut user = from_scheme(&SCHEMES[0]);
         user.source = Source::Pi;
@@ -1158,41 +1163,59 @@ mod tests {
     }
 
     #[test]
-    fn app_themes_read_their_background_and_pi_themes_ignore_it() {
+    fn app_themes_read_their_backdrop_and_pi_themes_ignore_it() {
         let text = r##"{
             "name": "Petals",
             "vars": {"pink": "#ffc9dd", "bg": "#120a10"},
             "colors": {"accent": "#f4a6c6", "text": "#f7edf2"},
-            "background": {"preset": "Petals", "colors": ["pink", "#fff", "nope", 7], "speed": 9, "intensity": 0}
+            "background": {"scene": "petals", "sky": ["pink", "#fff", "nope", 7]}
         }"##;
-        let theme = parse_pi_theme(text, Source::App).unwrap();
-        let wallpaper = theme.background.unwrap();
-        assert_eq!(wallpaper.kind, WallpaperKind::Petals);
+        let theme = parse_pi_theme(text, Source::App, None).unwrap();
+        let backdrop = theme.background.unwrap();
+        assert_eq!(backdrop.scene.unwrap().name, "petals");
         // Vars and hex resolve, an unknown name is skipped, an index is xterm's.
-        assert_eq!(wallpaper.colors, [0xffc9dd, 0xffffff, xterm256(7)]);
-        // Out-of-range numbers are clamped rather than rejected.
-        assert_eq!((wallpaper.speed, wallpaper.intensity), (3., 0.05));
+        assert_eq!(backdrop.sky, [0xffc9dd, 0xffffff, xterm256(7)]);
 
         // The same file in Pi's folder: Pi's schema has no `background`.
-        assert_eq!(parse_pi_theme(text, Source::Pi).unwrap().background, None);
-
-        // No colors: the theme's accent, info and success.
-        let plain = text.replace(r##""colors": ["pink", "#fff", "nope", 7], "##, "");
-        let theme = parse_pi_theme(&plain, Source::App).unwrap();
-        let defaults = theme.background.unwrap();
-        assert_eq!(defaults.colors, [theme.accent, theme.info, theme.success]);
-
-        // An unknown preset is no background, not a broken theme.
-        let unknown = text.replace("Petals\", \"colors", "lava\", \"colors");
-        let theme = parse_pi_theme(&unknown, Source::App).unwrap();
-        assert_eq!(theme.background, None);
+        assert_eq!(
+            parse_pi_theme(text, Source::Pi, None).unwrap().background,
+            None
+        );
     }
 
     #[test]
-    fn example_themes_ship_with_backgrounds_and_yield_to_user_ones() {
+    fn app_themes_may_use_claude_desktop_themes_colors() {
+        let text = r##"{"id": "koi", "name": "Koi", "bg": "#11332d", "text": "#e4f2ea",
+            "accent": "#ef8a4a", "wallpaper": "koi-pond"}"##;
+        let theme = parse_pi_theme(text, Source::App, None).unwrap();
+        assert_eq!(
+            (theme.bg, theme.fg, theme.accent),
+            (0x11332d, 0xe4f2ea, 0xef8a4a)
+        );
+        assert!(!theme.light);
+        // An unknown wallpaper is no scene; a built-in one is found by name.
+        assert_eq!(theme.background.unwrap().scene.unwrap().name, "koi-pond");
+        // Pi themes keep Pi's format only.
+        assert_ne!(parse_pi_theme(text, Source::Pi, None).unwrap().bg, 0x11332d);
+    }
+
+    #[test]
+    fn example_themes_ship_with_scenes_and_yield_to_user_ones() {
         let examples = example_themes();
-        assert_eq!(examples.len(), 4);
-        assert!(examples.iter().all(|t| t.background.is_some() && !t.light));
+        assert!(examples.len() >= 10);
+        assert!(
+            examples
+                .iter()
+                .all(|t| t.background.as_ref().is_some_and(|b| b.scene.is_some()))
+        );
+        // None hides behind (or hides) a popular scheme's name.
+        for example in &examples {
+            assert!(
+                !builtin_themes()
+                    .iter()
+                    .any(|t| same_name(&t.name, &example.name))
+            );
+        }
 
         // A user's app theme with an example's name replaces it.
         let mut mine = examples[0].clone();

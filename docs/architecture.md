@@ -74,7 +74,7 @@ crates/
 │       │   └── app_update/  updates/  welcome/
 │       ├── platform/            # OS integration: single instance, agent command shims, Dock and window icons, installed editors
 │       └── shared/              # pieces used by several features, with no logic of their own:
-│                                # ui, floating, themes, assets, banner, surge, pane, gentle_state
+│                                # ui, floating, themes, backdrop (theme scenes), assets, banner, surge, pane, gentle_state
 ├── core/                        # shared pure logic (gentle-core)
 └── pi-rpc/
 ```
