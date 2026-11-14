@@ -615,7 +615,7 @@ pub fn scrim(id: impl Into<ElementId>) -> AnimationElement<Div> {
 const SLOW_FRAME: Duration = Duration::from_millis(33);
 
 /// Seconds since the first live indicator drew; every indicator shares it.
-fn live_clock() -> f32 {
+pub(crate) fn live_clock() -> f32 {
     static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
     START
         .get_or_init(std::time::Instant::now)
@@ -630,7 +630,13 @@ fn live_phase(period: f32) -> f32 {
 
 /// Redraw the view being drawn after [`SLOW_FRAME`], once however many
 /// indicators it holds. Nothing with reduced motion.
-fn request_slow_frame(window: &mut Window, cx: &mut App) {
+pub(crate) fn request_slow_frame(window: &mut Window, cx: &mut App) {
+    request_frame_in(SLOW_FRAME, window, cx);
+}
+
+/// Redraw the view being drawn after `delay`, once however many elements
+/// ask. Nothing with reduced motion.
+pub(crate) fn request_frame_in(delay: Duration, window: &mut Window, cx: &mut App) {
     thread_local! {
         static PENDING: std::cell::RefCell<std::collections::HashSet<EntityId>> =
             Default::default();
@@ -643,7 +649,7 @@ fn request_slow_frame(window: &mut Window, cx: &mut App) {
         return;
     }
     cx.spawn(async move |cx| {
-        cx.background_executor().timer(SLOW_FRAME).await;
+        cx.background_executor().timer(delay).await;
         PENDING.with(|pending| pending.borrow_mut().remove(&view));
         cx.update(|cx| cx.notify(view));
     })

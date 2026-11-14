@@ -102,7 +102,10 @@ gpui_kit::assets::icon_assets!(
         // The device panel.
         Apple,
         PanelRight,
-        PictureInPicture2
+        PictureInPicture2,
+        // Configuration → Theme: share a theme, import one from a link.
+        Share2,
+        Link
     ]
 );
 
