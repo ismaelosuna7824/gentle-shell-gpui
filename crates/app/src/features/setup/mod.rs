@@ -302,6 +302,22 @@ pub fn install_diagram_renderer(log: &(dyn Fn(String) + Send + Sync)) -> Result<
     fetch::install_merman(log)
 }
 
+/// The Engram the app runs, as `X.Y.Z`, when it reports one.
+pub fn engram_version() -> Option<String> {
+    extras::engram_version()
+}
+
+/// Blocking: the latest Engram release's version, from GitHub.
+pub fn engram_latest() -> Result<String, String> {
+    fetch::engram_latest()
+}
+
+/// Blocking: update Engram the way it was installed (Homebrew, or the
+/// release binary in the app's toolchain); the version it runs afterwards.
+pub fn upgrade_engram(log: &(dyn Fn(String) + Send + Sync)) -> Result<String, String> {
+    extras::upgrade_engram(log)
+}
+
 /// Blocking: installs `id` unattended, streaming progress lines to `log`.
 pub fn install(id: CheckId, log: &(dyn Fn(String) + Send + Sync)) -> Result<(), String> {
     let result = match id {

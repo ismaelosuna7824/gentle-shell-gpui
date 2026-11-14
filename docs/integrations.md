@@ -279,6 +279,7 @@ App paths: `dirs::data_dir()/gentle-shell-gpui/` (on macOS, `~/Library/Applicati
 | `<data>/gentle-shell-gpui/settings.json` (`theme`, `transparency`, `onboarding`) | App | R/W | `shared/themes.rs` (`store_path`, `write_key`), `features/setup/mod.rs` (`first_run`, `mark_done`) |
 | `<data>/gentle-shell-gpui/workspaces.json` | App | R/W | `features/workspaces/store.rs` |
 | `<data>/gentle-shell-gpui/app-update.json` | App | R/W | `features/app_update/cache.rs` |
+| `<data>/gentle-shell-gpui/engram-update.json` (`checkedAt`, `latest`, `skipped`) | App | R/W | `features/updates/engram.rs` |
 | `<data>/gentle-shell-gpui/instance.json` (port and token, 0600) | App | R/W | `platform/instance.rs` |
 | `<data>/gentle-shell-gpui/toolchain/` | App | W | `features/setup/` |
 | Launcher `config.json` (`mode`, `dir`): `pi_rpc::launcher_config_path()`, `GENTLE_SHELL_CONFIG` or `~/.gentle-shell/config.json` | Launcher | R | `pi-rpc/home.rs` |
@@ -319,9 +320,11 @@ Blocking HTTP GET (ureq, 8 s, no redirects) on the background executor. Base URL
 
 `credentials.rs` reads `<agent>/auth.json` and resolves keys the way Pi does (`$VAR`, `!command`); `fetch.rs` makes one GET per card (20 s, no redirects so the token never leaves the origin, `User-Agent: gentle-pi`): Codex at `https://chatgpt.com/backend-api/wham/usage` and NaN at `https://cloud-api.nan.builders/api/usage/quota`. The parsers are `gentle_core::usage::subscription`.
 
-### Gentle Shell update (`features/updates/`)
+### Gentle Shell and Engram updates (`features/updates/`)
 
-Same as the launcher's startup check (`lib/gentle-shell-startup-update.ts`): `registry.rs` requests `https://registry.npmjs.org/gentle-pi/latest` (5 s, stable versions only); `cache.rs` stores `startupReleaseCheck` (`checkedAt`, `latest`, valid for one day) and `skippedStartupRelease` in the launcher config, so the terminal and the app agree. The offer is decided in `gentle_core::version::offer_for`. `settings/upgrade.rs` performs the install with `gentle-shell upgrade`, then `forget_cached` and `SettingsEvent::BackendUpdated` → `restart_for_update` on every tab.
+Same as the launcher's startup check (`lib/gentle-shell-startup-update.ts`): `registry.rs` requests `https://registry.npmjs.org/gentle-pi/latest` (5 s, stable versions only); `cache.rs` stores `startupReleaseCheck` (`checkedAt`, `latest`, valid for one day) and `skippedStartupRelease` in the launcher config, so the terminal and the app agree. One difference: a cached answer that offers nothing is asked again after an hour (`gentle_core::version::cached_answer_holds`), and the fresh answer is written back, so a release published after the last check shows the same day for both. Offline, the day-old answer is used. The offer is decided in `gentle_core::version::offer_for`. `settings/upgrade.rs` performs the install with `gentle-shell upgrade`, then `forget_cached` and `SettingsEvent::BackendUpdated` → `restart_for_update` on every tab.
+
+Engram (`engram.rs`): the installed version from `engram version`, the latest from `Gentleman-Programming/engram`'s latest GitHub release; a "newer" answer holds 6 h, "nothing newer" 1 h; skip in `engram-update.json`. **Update now** (`setup::upgrade_engram`) runs `brew upgrade gentleman-programming/tap/engram` when the running `engram` resolves into a Homebrew `Cellar`, otherwise installs the release binary into `toolchain/bin` (first on the app's PATH). A running Engram server keeps its version until it restarts.
 
 ### App update (`features/app_update/`)
 

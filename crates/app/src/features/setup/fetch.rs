@@ -377,6 +377,13 @@ pub fn install_node(log: &Log) -> Result<(), String> {
 
 // ── Engram ─────────────────────────────────────────────────────────────────
 
+/// The latest Engram release's version (`3.7.2`), from GitHub.
+pub fn engram_latest() -> Result<String, String> {
+    parse_release(&get_text(ENGRAM_LATEST, true)?)
+        .map(|release| release.version)
+        .ok_or_else(|| "GitHub's answer about Engram's latest release is unreadable.".into())
+}
+
 /// The latest Engram release binary into `<toolchain>/bin`, verified when
 /// the release publishes checksums.
 pub fn install_engram_release(log: &Log) -> Result<(), String> {

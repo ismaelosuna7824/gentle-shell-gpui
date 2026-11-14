@@ -89,6 +89,8 @@ pub struct SettingsView {
     music: music::Music,
     /// Devices: the switches, what this machine has, an install running.
     devices: devices::Devices,
+    /// Engram's own update.
+    engram: upgrade::EngramUpdate,
 }
 
 impl EventEmitter<SettingsEvent> for SettingsView {}
@@ -155,6 +157,7 @@ impl SettingsView {
             maestro: maestro::Maestro::default(),
             music: music::Music::default(),
             devices: devices::Devices::default(),
+            engram: upgrade::EngramUpdate::default(),
         };
         this.reload(cx);
         this.refresh_maestro(cx);
@@ -184,6 +187,8 @@ impl SettingsView {
                     snapshot.update =
                         crate::features::updates::current_from_versions(&snapshot.versions)
                             .and_then(crate::features::updates::check);
+                    snapshot.engram_update = crate::features::setup::engram_version()
+                        .and_then(|v| crate::features::updates::engram::check(&v));
                     snapshot
                 })
                 .await;
@@ -236,6 +241,7 @@ impl Render for SettingsView {
                                 d.child(self.render_update(offer, cx))
                             })
                             .children(self.upgrade.as_ref().map(upgrade::upgrade_result))
+                            .child(self.render_engram_update(s.engram_update.clone(), cx))
                             .child(
                                 h_flex()
                                     .pt_2()
