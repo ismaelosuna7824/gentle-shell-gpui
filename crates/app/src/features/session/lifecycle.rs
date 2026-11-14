@@ -25,20 +25,19 @@ impl SessionView {
         self.animate_banner(cx);
     }
 
-    /// Write the wordmark in over ~1.2 s, like the terminal intro.
+    /// Bloom the rose and write the wordmark in over
+    /// [`crate::shared::banner::WRITE`]; the banner paces it.
     fn animate_banner(&mut self, cx: &mut Context<Self>) {
         self.banner_reveal = 0.0;
         self._banner_anim = cx.spawn(async move |this, cx| {
-            const FRAMES: u32 = 72;
-            for frame in 1..=FRAMES {
-                cx.background_executor()
-                    .timer(Duration::from_millis(16))
-                    .await;
-                let t = frame as f32 / FRAMES as f32;
-                let eased = 1.0 - (1.0 - t).powi(3);
+            const FRAME: Duration = Duration::from_millis(16);
+            let frames = (crate::shared::banner::WRITE.as_millis() / FRAME.as_millis()) as u32;
+            for frame in 1..=frames {
+                cx.background_executor().timer(FRAME).await;
+                let t = frame as f32 / frames as f32;
                 if this
                     .update(cx, |this, cx| {
-                        this.banner_reveal = eased;
+                        this.banner_reveal = t;
                         // Only the hero shows the banner: repaint just this pane, and only then.
                         if this.hero_shown() {
                             cx.notify();
