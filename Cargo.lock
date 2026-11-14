@@ -2182,7 +2182,7 @@ dependencies = [
 
 [[package]]
 name = "gentle-core"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "hmac",
  "regex",
@@ -2193,7 +2193,7 @@ dependencies = [
 
 [[package]]
 name = "gentle-shell-gpui"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "alacritty_terminal",
  "anyhow",
@@ -5330,7 +5330,7 @@ dependencies = [
 
 [[package]]
 name = "pi-rpc"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "anyhow",
  "async-channel",
