@@ -324,24 +324,53 @@ pub fn layer(window: &mut Window, cx: &mut App) -> Option<AnyElement> {
 /// background, fading in from lively sides.
 fn paint_veil(bg: u32, veil: f32, bounds: Bounds<Pixels>, window: &mut Window) {
     let w = bounds.size.width;
-    let clear = color(bg as f64, 0.);
-    let calm = color(bg as f64, f64::from(veil) * 0.85);
-    // 0–18% clear, 18–32% fading in, 32–68% calm, 68–82% fading out.
-    // The bands are translucent, so they meet edge to edge on whole pixels:
-    // any overlap would draw twice and show as a darker line.
+    let calm = f64::from(veil) * 0.85;
+    // How calm at `u` (0 left, 1 right): clear at the sides, full in the
+    // middle, with smoothstep shoulders. A straight ramp meeting the flat
+    // middle shows a crease the eye reads as a line, so each shoulder is
+    // many short ramps along a curve whose slope fades to zero at both ends.
+    let shoulder = |t: f32| {
+        let t = t.clamp(0., 1.);
+        t * t * (3. - 2. * t)
+    };
+    let alpha = |u: f32| {
+        let rise = shoulder((u - 0.1) / 0.26);
+        let fall = shoulder((0.9 - u) / 0.26);
+        calm * f64::from(rise.min(fall))
+    };
+    // Translucent bands meet edge to edge on whole pixels: any overlap
+    // would draw twice and show as a darker line.
     let edge = |at: f32| (bounds.origin.x + w * at).round();
-    let band = |from: f32, to: f32| {
+    let paint = |from: f32, to: f32, window: &mut Window| {
         let (left, right) = (edge(from), edge(to));
-        Bounds::new(
+        if right <= left {
+            return;
+        }
+        let band = Bounds::new(
             point(left, bounds.origin.y),
             size(right - left, bounds.size.height),
-        )
+        );
+        let (a, b) = (alpha(from), alpha(to));
+        let fill_with: Background = if a == b {
+            color(bg as f64, a).into()
+        } else {
+            linear_gradient(
+                90.,
+                linear_color_stop(color(bg as f64, a), 0.),
+                linear_color_stop(color(bg as f64, b), 1.),
+            )
+        };
+        window.paint_quad(fill(band, fill_with));
     };
-    let ramp =
-        |a: Hsla, b: Hsla| linear_gradient(90., linear_color_stop(a, 0.), linear_color_stop(b, 1.));
-    window.paint_quad(fill(band(0.18, 0.32), ramp(clear, calm)));
-    window.paint_quad(fill(band(0.32, 0.68), calm));
-    window.paint_quad(fill(band(0.68, 0.82), ramp(calm, clear)));
+    const STEPS: usize = 16;
+    for (start, end) in [(0.1, 0.36), (0.64, 0.9)] {
+        for i in 0..STEPS {
+            let from = start + (end - start) * i as f32 / STEPS as f32;
+            let to = start + (end - start) * (i + 1) as f32 / STEPS as f32;
+            paint(from, to, window);
+        }
+    }
+    paint(0.36, 0.64, window);
 }
 
 fn color(hex: f64, alpha: f64) -> Hsla {
