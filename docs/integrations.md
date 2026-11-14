@@ -291,6 +291,7 @@ App paths: `dirs::data_dir()/gentle-shell-gpui/` (on macOS, `~/Library/Applicati
 | `<agent>/gentle-ai/managed-assets.json` | Gentle AI installer | R/W | `profiles/apply.rs` |
 | `<agent>/claude-bridge.json` | Claude bridge | R/W | `settings/claude.rs` |
 | `<agent>/themes/*.json` | User | R | `shared/themes.rs` |
+| `<data>/gentle-shell-gpui/themes/` (`*.json`, `*.gentletheme`, scene `*.js`, images; `GUIDE.md` and `scene-error.txt` written by the app) | App, the user and their agents | R/W | `shared/themes.rs`, `shared/backdrop/`, `devices/instructions.rs` (`GUIDE.md`) |
 | `<config>/profiles.json`, `<config>/models.json`, `<config>/profile-fallbacks.json` | Gentle AI | R/W | `profiles/files.rs`, `profiles/env.rs` |
 | `<config>/permission-mode.json` (2 keys, 0600, atomic write) | Gentle AI | R/W | `shared/gentle_state.rs` |
 | `<config>/notifications.json` | Gentle AI | R/W | `features/alerts/policy.rs` |

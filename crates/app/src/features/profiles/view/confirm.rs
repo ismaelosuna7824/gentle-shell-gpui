@@ -98,11 +98,33 @@ impl ProfilesView {
                     ],
                 )
             }
+            Confirm::ReplaceImport(export) => {
+                let import = export.clone();
+                (
+                    "Replace profile?".into(),
+                    vec![format!(
+                        "Profile \"{}\" already exists. Replace its routing with the import?",
+                        export.name
+                    )],
+                    vec![
+                        Button::new("import-replace")
+                            .small()
+                            .danger()
+                            .icon(Icon::new(IconName::Download))
+                            .label("Replace")
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.add_import(import.clone(), cx)
+                            }))
+                            .into_any_element(),
+                    ],
+                )
+            }
         };
         let icon = match confirm {
             Confirm::MakeDefault(_) => Icon::new(IconName::Star).text_color(ui::accent()),
             Confirm::Unsaved(_) => Icon::new(IconName::TriangleAlert).text_color(ui::warning()),
             Confirm::Delete(_) => Icon::new(IconName::Trash).text_color(ui::danger()),
+            Confirm::ReplaceImport(_) => Icon::new(IconName::Download).text_color(ui::warning()),
         };
         Some(
             ui::pop_in(

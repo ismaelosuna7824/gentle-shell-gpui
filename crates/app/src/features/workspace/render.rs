@@ -75,6 +75,8 @@ impl Render for Workspace {
             .relative()
             .left(px(shake_x))
             .top(px(shake_y))
+            // The theme's backdrop, first so everything draws over it.
+            .children(crate::shared::backdrop::layer(window, cx))
             .child(
                 TitleBar::new()
                     .h(px(TITLE_BAR_HEIGHT))
@@ -286,7 +288,7 @@ impl Render for Workspace {
                                                                     },
                                                                 ))
                                                                 .item(entry(
-                                                                    IconName::Layers,
+                                                                    IconName::Route,
                                                                     "Profiles",
                                                                     "Model and effort per agent",
                                                                     |this, window, cx| {
@@ -368,7 +370,7 @@ impl Render for Workspace {
                                         ))
                                         .child(button(
                                             "open-profiles",
-                                            IconName::Layers,
+                                            IconName::Route,
                                             "Profiles: model and effort per agent",
                                             open(|o| matches!(o, Overlay::Profiles(_))),
                                             |this, window, cx| this.open_profiles(window, cx),
